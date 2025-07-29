@@ -7,8 +7,13 @@ import { generateImage, generateParodyImagePrompt } from '@/lib/image-generation
 import { ParodyStyleKey } from '@/lib/styles';
 
 export async function POST(req: NextRequest) {
+  let url: string = '';
+  let style: ParodyStyleKey = 'corporate-buzzword';
+  
   try {
-    const { url, style }: { url: string; style: ParodyStyleKey } = await req.json();
+    const body = await req.json();
+    url = body.url;
+    style = body.style;
     
     if (!url) {
       return NextResponse.json(
@@ -58,15 +63,27 @@ export async function POST(req: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Parody generation failed:', error);
+    console.error('❌ Parody generation failed:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+    
+    // Log detailed error for debugging
+    console.error('Error details:', {
+      requestUrl: url,
+      requestStyle: style,
+      errorType,
+      errorMessage,
+      timestamp: new Date().toISOString()
+    });
     
     return NextResponse.json(
       { 
         success: false, 
         error: 'Failed to generate parody',
-        details: errorMessage
+        details: errorMessage,
+        errorType,
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );

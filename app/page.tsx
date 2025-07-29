@@ -15,7 +15,10 @@ interface ParodyResult {
   style: string;
   summary: string;
   imageUrl?: string;
+  captureStrategy?: string;
   error?: string;
+  errorType?: string;
+  timestamp?: string;
 }
 
 export default function Home() {
@@ -192,8 +195,21 @@ export default function Home() {
                   </CardTitle>
                   <CardDescription>
                     {result.success 
-                      ? `${result.summary} (Style: ${PARODY_STYLES[result.style as keyof typeof PARODY_STYLES]?.name})`
-                      : result.error
+                      ? (
+                          <div className="space-y-2">
+                            <p>{result.summary}</p>
+                            <div className="flex gap-4 text-xs text-gray-500">
+                              <span>Style: {PARODY_STYLES[result.style as keyof typeof PARODY_STYLES]?.name}</span>
+                              {result.captureStrategy && <span>Method: {result.captureStrategy}</span>}
+                            </div>
+                          </div>
+                        )
+                      : (
+                          <div className="space-y-1">
+                            <p className="text-red-600">{result.error}</p>
+                            {result.errorType && <p className="text-xs text-gray-500">Type: {result.errorType}</p>}
+                          </div>
+                        )
                     }
                   </CardDescription>
                 </div>
