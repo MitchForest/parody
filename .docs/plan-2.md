@@ -209,3 +209,209 @@ If Browserless continues to be problematic, consider:
 4. **Vercel Edge Functions** with lightweight capture
 
 This plan ensures the parody generator becomes a reliable, scalable, and feature-rich application that exceeds the original vision.
+
+## UPDATED: Current Error Analysis & Immediate Action Plan
+
+### Error Summary (Latest Test Results)
+1. **Browserless**: 403 Forbidden - Authentication issue
+2. **ScreenshotAPI**: 400 Bad Request - Missing/invalid API token
+3. **HTML-only**: Works but no screenshot capability
+4. **Result**: Falls back to HTML-only, losing visual parody functionality
+
+### Root Cause Analysis
+
+#### 1. Browserless 403 Error
+- **Issue**: API key authentication is being rejected
+- **Likely Causes**:
+  - Invalid API key format
+  - Wrong endpoint (need to use production-sfo subdomain)
+  - Account limitations or expired trial
+  - CORS/referrer restrictions
+
+#### 2. ScreenshotAPI 400 Error
+- **Issue**: Hardcoded "YOUR_TOKEN" placeholder never replaced
+- **Code Location**: Line 84 in capture-strategies.ts
+
+### Immediate Fixes Required
+
+#### Fix 1: Browserless Authentication (High Priority)
+```typescript
+// Option A: Use production endpoint with correct format
+const screenshotResponse = await fetch('https://production-sfo.browserless.io/screenshot', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    token: apiKey,  // Token in body, not URL
+    url: normalizedUrl,
+    options: {
+      fullPage: true,
+      type: 'png',
+      quality: 80,
+      viewport: {
+        width: 1920,
+        height: 1080
+      }
+    },
+    gotoOptions: {
+      waitUntil: 'networkidle2'
+    }
+  })
+});
+
+// Option B: Try Chrome endpoint
+const screenshotResponse = await fetch('https://chrome.browserless.io/screenshot', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey  // Try without Bearer prefix
+  },
+  body: JSON.stringify({
+    url: normalizedUrl,
+    fullPage: true,
+    type: 'png'
+  })
+});
+```
+
+#### Fix 2: Add Alternative Screenshot Services
+```typescript
+// 1. Screenshotmachine.com (100 free/month)
+async function screenshotMachineCapture(url: string): Promise<CaptureResult> {
+  const apiKey = process.env.SCREENSHOTMACHINE_KEY || '';
+  const params = new URLSearchParams({
+    key: apiKey,
+    url: url,
+    dimension: '1920x1080',
+    format: 'png',
+    cacheLimit: '0',
+    delay: '3000'
+  });
+  
+  const screenshotUrl = `https://api.screenshotmachine.com?${params}`;
+  const response = await fetch(screenshotUrl);
+  // ... rest of implementation
+}
+
+// 2. URL2PNG (Free tier available)
+async function url2pngCapture(url: string): Promise<CaptureResult> {
+  const apiKey = process.env.URL2PNG_KEY || '';
+  const apiSecret = process.env.URL2PNG_SECRET || '';
+  // ... implementation with proper auth
+}
+
+// 3. Microlink API (Free tier)
+async function microlinkCapture(url: string): Promise<CaptureResult> {
+  const response = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url`);
+  const data = await response.json();
+  const screenshotUrl = data.data.screenshot.url;
+  // ... fetch screenshot
+}
+```
+
+#### Fix 3: Implement Puppeteer Cloud Function
+```typescript
+// Deploy to Vercel Edge Function or Cloudflare Worker
+export async function screenshotEdgeFunction(url: string) {
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: 'networkidle2' });
+  const screenshot = await page.screenshot({ fullPage: true });
+  const html = await page.content();
+  
+  await browser.close();
+  return { screenshot, html };
+}
+```
+
+### Emergency Action Plan (Do This Now)
+
+#### Step 1: Debug Browserless Connection
+```bash
+# Test Browserless API directly
+curl -X POST https://chrome.browserless.io/screenshot?token=YOUR_KEY \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+
+# Check API key validity
+curl https://chrome.browserless.io/pressure?token=YOUR_KEY
+```
+
+#### Step 2: Implement Quick Fix
+1. Add environment variable check and validation
+2. Implement Microlink as immediate free alternative
+3. Add proper error messages for debugging
+
+#### Step 3: Update capture-strategies.ts
+```typescript
+// Add at top of file
+const CAPTURE_CONFIG = {
+  browserless: {
+    endpoint: process.env.BROWSERLESS_ENDPOINT || 'https://chrome.browserless.io',
+    apiKey: process.env.BROWSERLESS_API_KEY,
+    timeout: 30000
+  },
+  microlink: {
+    endpoint: 'https://api.microlink.io',
+    timeout: 20000
+  },
+  screenshotapi: {
+    apiKey: process.env.SCREENSHOTAPI_TOKEN,
+    endpoint: 'https://shot.screenshotapi.net/screenshot'
+  }
+};
+
+// Validate on startup
+function validateCaptureConfig() {
+  const warnings = [];
+  if (!CAPTURE_CONFIG.browserless.apiKey) {
+    warnings.push('BROWSERLESS_API_KEY not configured');
+  }
+  if (!CAPTURE_CONFIG.screenshotapi.apiKey) {
+    warnings.push('SCREENSHOTAPI_TOKEN not configured');
+  }
+  if (warnings.length > 0) {
+    console.warn('⚠️  Capture configuration warnings:', warnings);
+  }
+}
+```
+
+### Recommended Immediate Actions
+
+1. **Right Now** (5 minutes):
+   - Check Browserless dashboard for API key status
+   - Verify API key format (should be 32+ characters)
+   - Test API key with curl command above
+
+2. **Next 30 minutes**:
+   - Implement Microlink as free fallback
+   - Add proper environment variable validation
+   - Fix ScreenshotAPI token configuration
+
+3. **Today**:
+   - Set up at least 3 working screenshot services
+   - Implement proper retry logic with exponential backoff
+   - Add performance monitoring
+
+4. **This Week**:
+   - Deploy Puppeteer edge function as reliable fallback
+   - Implement caching layer to reduce API calls
+   - Add preview mode that works without screenshots
+
+### Cost-Free Alternatives for Testing
+
+1. **Microlink API**: 50 req/day free
+2. **Screenshotmachine**: 100/month free
+3. **Page2Images**: 100/month free
+4. **HTML/CSS Screenshot**: Generate fake screenshots with CSS
+
+### Success Criteria
+- At least 2 working screenshot services
+- 95% success rate for popular websites
+- Graceful degradation to HTML-only mode
+- Clear error messages for debugging
