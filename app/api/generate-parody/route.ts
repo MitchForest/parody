@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { captureWebsite } from '@/lib/capture';
+import { captureWithFallbacks } from '@/lib/capture-strategies';
 import { extractContent } from '@/lib/extract';
 import { generateParody } from '@/lib/parody';
 import { generateHTML } from '@/lib/generate';
@@ -24,9 +24,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Capture website
-    console.log('Capturing website:', url);
-    const { screenshot, html } = await captureWebsite(url);
+    // 1. Capture website with fallback strategies
+    console.log('🚀 Starting capture for:', url);
+    const { screenshot, html, strategy } = await captureWithFallbacks(url);
+    console.log(`✅ Captured with strategy: ${strategy}`);
     
     // 2. Extract content
     console.log('Extracting content...');
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       originalUrl: url,
       style: style,
       summary: parodyContent.summary,
+      captureStrategy: strategy,
       screenshotTaken: screenshot.length > 0
     });
     

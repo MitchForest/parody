@@ -23,6 +23,11 @@ export const PARODY_STYLES = {
     name: 'Conspiracy Theorist',
     systemPrompt: 'Make everything sound like a conspiracy theory',
     examples: 'they dont want you to know, wake up sheeple, follow the money'
+  },
+  'simpsons': {
+    name: 'Simpsons Character',
+    systemPrompt: 'Transform everything to sound like various Simpsons characters. Mix Homer\'s "D\'oh!", Bart\'s rebellious phrases, Lisa\'s intellectual observations, and Mr. Burns\' villainous expressions',
+    examples: 'D\'oh!, Ay caramba!, Excellent, Stupid sexy Flanders, I am so smart S-M-R-T'
   }
 };
 

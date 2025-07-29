@@ -21,20 +21,19 @@ export async function captureWebsite(url: string): Promise<CaptureResult> {
   const normalizedUrl = normalizeUrl(url);
   console.log('Capturing URL:', normalizedUrl);
 
-  // Take screenshot
-  const screenshotResponse = await fetch('https://chrome.browserless.io/screenshot', {
+  // Take screenshot - FIXED: Use token in URL, not Bearer header
+  const screenshotResponse = await fetch(`https://chrome.browserless.io/screenshot?token=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Cache-Control': 'no-cache'
     },
     body: JSON.stringify({
       url: normalizedUrl,
-      options: {
-        fullPage: true,
-        type: 'png',
-        waitForTimeout: 3000
-      }
+      fullPage: true,
+      type: 'png',
+      waitForTimeout: 5000,
+      blockAds: true
     })
   });
 
@@ -46,16 +45,16 @@ export async function captureWebsite(url: string): Promise<CaptureResult> {
 
   const screenshot = Buffer.from(await screenshotResponse.arrayBuffer());
 
-  // Get HTML content
-  const contentResponse = await fetch('https://chrome.browserless.io/content', {
+  // Get HTML content - FIXED: Use token in URL
+  const contentResponse = await fetch(`https://chrome.browserless.io/content?token=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Cache-Control': 'no-cache'
     },
     body: JSON.stringify({ 
       url: normalizedUrl,
-      waitForTimeout: 3000
+      waitForTimeout: 5000
     })
   });
 
