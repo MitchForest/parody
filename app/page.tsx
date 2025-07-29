@@ -1,212 +1,232 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Sparkles, Wand2, ArrowRight, Github, Twitter } from 'lucide-react'
-import ImageDropzone from '@/components/upload/image-dropzone'
-import PromptInput from '@/components/generation/prompt-input'
-import ModelSelector from '@/components/generation/model-selector'
-import { useAppStore } from '@/lib/store'
-import { toast } from 'sonner'
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PARODY_STYLES } from '@/lib/styles';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, Globe, Sparkles } from 'lucide-react';
+
+interface ParodyResult {
+  success: boolean;
+  html: string;
+  originalUrl: string;
+  style: string;
+  summary: string;
+  imageUrl?: string;
+  error?: string;
+}
 
 export default function Home() {
-  const { 
-    uploadedImage, 
-    prompt, 
-    selectedModel, 
-    generationStatus,
-    setGenerationStatus 
-  } = useAppStore()
-  
-  const [progress, setProgress] = useState(0)
+  const [url, setUrl] = useState('');
+  const [style, setStyle] = useState('corporate-buzzword');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ParodyResult | null>(null);
 
-  const canGenerate = uploadedImage && prompt.trim().length > 0
-
-  const handleGenerate = async () => {
-    if (!canGenerate) {
-      toast.error('Please upload an image and enter a prompt')
-      return
-    }
-
-    setGenerationStatus('generating')
-    setProgress(0)
-
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval)
-          return 90
-        }
-        return prev + Math.random() * 15
-      })
-    }, 500)
-
+  const generateParody = async () => {
+    if (!url) return;
+    
+    setLoading(true);
+    setResult(null);
+    
     try {
-      // TODO: Implement actual API call
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      const response = await fetch('/api/generate-parody', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, style })
+      });
       
-      setProgress(100)
-      setTimeout(() => {
-        setGenerationStatus('complete')
-        toast.success('Parody generated successfully!')
-      }, 500)
-    } catch (error) {
-      setGenerationStatus('error')
-      toast.error('Generation failed. Please try again.')
+      const data = await response.json();
+      setResult(data);
+    } catch (err) {
+      setResult({
+        success: false,
+        html: '',
+        originalUrl: url,
+        style,
+        summary: '',
+        error: 'Network error occurred'
+      });
     } finally {
-      clearInterval(progressInterval)
+      setLoading(false);
     }
-  }
+  };
+
+  const downloadHTML = () => {
+    if (!result?.html) return;
+    
+    const blob = new Blob([result.html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `parody-${result.style}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-8 h-8 text-yellow-400" />
-              <h1 className="text-2xl font-bold text-white">Parody Generator</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                <Github className="w-4 h-4 mr-2" />
-                GitHub
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                <Twitter className="w-4 h-4 mr-2" />
-                Twitter
-              </Button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="container mx-auto max-w-6xl">
+        <div className="text-center py-12">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Website Parody Generator
+          </h1>
+          <p className="text-xl text-gray-600 mb-8">
+            Transform any website into hilarious parodies with AI
+          </p>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Hero Section */}
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-6xl font-bold text-white mb-4">
-              Transform Websites into
-              <span className="bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-                {" "}Hilarious Parodies
-              </span>
-            </h2>
-            <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Upload any website screenshot and let AI transform it into a comedy masterpiece. 
-              Choose your style, pick your model, and watch the magic happen.
-            </p>
-            
-            {/* Stats */}
-            <div className="flex items-center justify-center gap-8 mb-8">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">3</div>
-                <div className="text-sm text-gray-500">AI Models</div>
+        <div className="grid lg:grid-cols-2 gap-8">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Generate Parody
+              </CardTitle>
+              <CardDescription>
+                Enter a website URL and choose a parody style to get started
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <label htmlFor="url" className="text-sm font-medium text-gray-700">
+                  Website URL
+                </label>
+                <Input
+                  id="url"
+                  placeholder="https://example.com"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="text-base"
+                />
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">&lt;30s</div>
-                <div className="text-sm text-gray-500">Generation Time</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">∞</div>
-                <div className="text-sm text-gray-500">Possibilities</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Generation Interface */}
-          <div className="grid lg:grid-cols-2 gap-8 mb-12">
-            {/* Left Column */}
-            <div className="space-y-6">
-              <ImageDropzone />
-              <PromptInput />
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
-              <ModelSelector />
               
-              {/* Generation Button */}
-              <Card className="p-6 bg-black/20 border-white/10 backdrop-blur-sm">
-                <div className="space-y-4">
-                  {generationStatus === 'generating' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400">Generating parody...</span>
-                        <span className="text-white">{Math.round(progress)}%</span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
-                      <p className="text-xs text-gray-500 text-center">
-                        This usually takes 15-30 seconds
-                      </p>
-                    </div>
-                  )}
-                  
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={!canGenerate || generationStatus === 'generating'}
-                    className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-yellow-500 to-pink-500 hover:from-yellow-600 hover:to-pink-600 text-white border-0"
+              <div className="space-y-2">
+                <label htmlFor="style" className="text-sm font-medium text-gray-700">
+                  Parody Style
+                </label>
+                <Select value={style} onValueChange={setStyle}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PARODY_STYLES).map(([key, styleConfig]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{styleConfig.name}</span>
+                          <span className="text-xs text-gray-500">{styleConfig.examples}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Button 
+                onClick={generateParody} 
+                disabled={loading || !url}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                size="lg"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating Parody...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate Parody
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Preview Styles</CardTitle>
+              <CardDescription>
+                See what each parody style does to content
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(PARODY_STYLES).map(([key, styleConfig]) => (
+                  <div 
+                    key={key}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      style === key 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setStyle(key)}
                   >
-                    {generationStatus === 'generating' ? (
+                    <h3 className="font-semibold text-sm">{styleConfig.name}</h3>
+                    <p className="text-xs text-gray-600 mt-1">{styleConfig.systemPrompt}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {result && (
+          <Card className="mt-8 shadow-lg">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    {result.success ? (
                       <>
-                        <Wand2 className="w-5 h-5 mr-2 animate-spin" />
-                        Generating...
+                        <Sparkles className="h-5 w-5 text-green-500" />
+                        Parody Generated!
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        Generate Parody
-                        <ArrowRight className="w-5 h-5 ml-2" />
+                        <div className="h-5 w-5 rounded-full bg-red-500" />
+                        Generation Failed
                       </>
                     )}
-                  </Button>
-                  
-                  {!canGenerate && (
-                    <p className="text-xs text-gray-500 text-center">
-                      Upload an image and enter a prompt to generate
-                    </p>
-                  )}
+                  </CardTitle>
+                  <CardDescription>
+                    {result.success 
+                      ? `${result.summary} (Style: ${PARODY_STYLES[result.style as keyof typeof PARODY_STYLES]?.name})`
+                      : result.error
+                    }
+                  </CardDescription>
                 </div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Example Gallery */}
-          <div className="text-center">
-            <h3 className="text-2xl font-bold text-white mb-4">See It In Action</h3>
-            <p className="text-gray-400 mb-8">Here are some examples of what you can create</p>
-            
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                { title: "Corporate Jargon", desc: "LinkedIn → Buzzword Paradise" },
-                { title: "Gen Z Vibes", desc: "News Site → Chronically Online" },
-                { title: "Medieval Times", desc: "E-commerce → Ye Olde Shoppe" }
-              ].map((example, i) => (
-                <Card key={i} className="p-6 bg-black/20 border-white/10 backdrop-blur-sm hover:bg-white/5 transition-colors cursor-pointer">
-                  <div className="aspect-video bg-gradient-to-br from-gray-700 to-gray-800 rounded-lg mb-4 flex items-center justify-center">
-                    <Sparkles className="w-8 h-8 text-gray-500" />
+                {result.success && (
+                  <div className="flex gap-2">
+                    <Button onClick={downloadHTML} variant="outline">
+                      Download HTML
+                    </Button>
+                    {result.imageUrl && (
+                      <Button asChild variant="outline">
+                        <a href={result.imageUrl} target="_blank" rel="noopener noreferrer">
+                          View AI Image
+                        </a>
+                      </Button>
+                    )}
                   </div>
-                  <h4 className="font-semibold text-white mb-1">{example.title}</h4>
-                  <p className="text-sm text-gray-400">{example.desc}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/10 mt-16">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center text-gray-500">
-            <p>&copy; 2024 Parody Generator. Made with ✨ and AI.</p>
-          </div>
-        </div>
-      </footer>
+                )}
+              </div>
+            </CardHeader>
+            {result.success && (
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden">
+                  <iframe
+                    srcDoc={result.html}
+                    className="w-full h-[600px]"
+                    title="Parody Preview"
+                  />
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
+      </div>
     </div>
-  )
+  );
 }

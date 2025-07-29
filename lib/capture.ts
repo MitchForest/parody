@@ -3,12 +3,23 @@ export interface CaptureResult {
   html: string;
 }
 
+function normalizeUrl(url: string): string {
+  // Add https:// if no protocol specified
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return `https://${url}`;
+  }
+  return url;
+}
+
 export async function captureWebsite(url: string): Promise<CaptureResult> {
   const apiKey = process.env.BROWSERLESS_API_KEY;
   
   if (!apiKey) {
     throw new Error('BROWSERLESS_API_KEY is not configured');
   }
+
+  const normalizedUrl = normalizeUrl(url);
+  console.log('Capturing URL:', normalizedUrl);
 
   // Take screenshot
   const screenshotResponse = await fetch('https://chrome.browserless.io/screenshot', {
@@ -18,16 +29,19 @@ export async function captureWebsite(url: string): Promise<CaptureResult> {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      url: url,
+      url: normalizedUrl,
       options: {
         fullPage: true,
-        type: 'png'
+        type: 'png',
+        waitForTimeout: 3000
       }
     })
   });
 
   if (!screenshotResponse.ok) {
-    throw new Error(`Screenshot failed: ${screenshotResponse.statusText}`);
+    const errorText = await screenshotResponse.text();
+    console.error('Screenshot API Error:', errorText);
+    throw new Error(`Screenshot failed: ${screenshotResponse.status} ${screenshotResponse.statusText} - ${errorText}`);
   }
 
   const screenshot = Buffer.from(await screenshotResponse.arrayBuffer());
@@ -39,11 +53,16 @@ export async function captureWebsite(url: string): Promise<CaptureResult> {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify({ url })
+    body: JSON.stringify({ 
+      url: normalizedUrl,
+      waitForTimeout: 3000
+    })
   });
 
   if (!contentResponse.ok) {
-    throw new Error(`Content extraction failed: ${contentResponse.statusText}`);
+    const errorText = await contentResponse.text();
+    console.error('Content API Error:', errorText);
+    throw new Error(`Content extraction failed: ${contentResponse.status} ${contentResponse.statusText} - ${errorText}`);
   }
 
   const html = await contentResponse.text();
