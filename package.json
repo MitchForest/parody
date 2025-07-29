@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "node tests/api-integration.test.js",
+    "test:browserless": "node tests/browserless-api.test.js",
+    "test:html": "node tests/html-extraction.test.js",
+    "test:endpoints": "node tests/browserless-endpoints.test.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
