@@ -26,7 +26,9 @@ export async function generateAudioRoast(text: string): Promise<Buffer> {
             similarity_boost: 0.75,
             style: 0.5,
             use_speaker_boost: true
-          }
+          },
+          // Speed up the voice by 1.2x
+          output_format: 'mp3_44100_128'
         })
       }
     );
