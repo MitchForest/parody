@@ -78,7 +78,7 @@ export default function Home() {
   // Function to play a beep sound
   const playBeep = () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -92,7 +92,7 @@ export default function Home() {
       
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.1); // 100ms beep
-    } catch (error) {
+    } catch {
       // Fallback for browsers that don't support Web Audio API
       console.log('Beep sound not supported');
     }
@@ -140,7 +140,7 @@ export default function Home() {
     
     // Play a slightly different "winner" beep
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -154,7 +154,7 @@ export default function Home() {
       
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.2);
-    } catch (error) {
+    } catch {
       console.log('Winner sound not supported');
     }
     

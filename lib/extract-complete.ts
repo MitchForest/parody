@@ -134,7 +134,7 @@ function extractImages($: cheerio.CheerioAPI): CompleteExtraction['images'] {
     const src = $elem.attr('src');
     
     if (src) {
-      const context = detectImageContext($elem, $);
+      const context = detectImageContext($elem);
       
       images.push({
         src: makeAbsoluteUrl(src),
@@ -176,7 +176,7 @@ function extractImages($: cheerio.CheerioAPI): CompleteExtraction['images'] {
   return images;
 }
 
-function detectImageContext($elem: any, _$: cheerio.CheerioAPI): 'hero' | 'content' | 'background' | 'icon' {
+function detectImageContext($elem: any): 'hero' | 'content' | 'background' | 'icon' {
   const src = $elem.attr('src') || '';
   const alt = $elem.attr('alt') || '';
   const className = $elem.attr('class') || '';
