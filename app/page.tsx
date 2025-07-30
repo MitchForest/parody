@@ -12,7 +12,9 @@ const PORTFOLIO_LINKS = [
   'https://www.trevoralpert.com/projects',
   'https://cjonescode.github.io/',
   'https://www.sadaqat.ai/',
-  'https://patrickskinner.tech/'
+  'https://patrickskinner.tech/',
+  'https://www.austintheatre.org/moontower-comedy/performers/avery-moore/',
+  'https://www.austenallred.com/'
 ];
 
 export default function Home() {
