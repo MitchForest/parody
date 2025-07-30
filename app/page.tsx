@@ -1,272 +1,212 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PARODY_STYLES } from '@/lib/styles';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Globe, Sparkles } from 'lucide-react';
-
-interface ParodyResult {
-  success: boolean;
-  parodyId?: string;
-  parodyUrl?: string;
-  blobUrl?: string;
-  comparisonUrl?: string;
-  downloadUrl?: string;
-  originalUrl: string;
-  style: string;
-  summary: string;
-  captureStrategy?: string;
-  stats?: {
-    imagesTransformed: number;
-    textElementsTransformed: number;
-    stylesApplied: number;
-    totalProcessingTime: number;
-    fileSize: number;
-  };
-  error?: string;
-  errorType?: string;
-  timestamp?: string;
-}
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, Flame, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 
 export default function Home() {
   const [url, setUrl] = useState('');
-  const [style, setStyle] = useState('corporate-buzzword');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ParodyResult | null>(null);
+  const [roast, setRoast] = useState<{
+    text: string;
+    audioUrl: string;
+    portfolioName?: string;
+  } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const generateParody = async () => {
+  const handleRoast = async () => {
     if (!url) return;
     
     setLoading(true);
-    setResult(null);
+    setRoast(null);
     
     try {
-      const response = await fetch('/api/generate-parody', {
+      const response = await fetch('/api/roast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, style })
+        body: JSON.stringify({ url })
       });
       
+      if (!response.ok) {
+        throw new Error('Failed to generate roast');
+      }
+      
       const data = await response.json();
-      setResult(data);
+      setRoast(data);
+      setShowPreview(true);
+      
+      // Auto-play the audio
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.play();
+          setIsPlaying(true);
+        }
+      }, 100);
     } catch (error) {
-      console.error('Generation failed:', error);
-      setResult({
-        success: false,
-        originalUrl: url,
-        style,
-        summary: '',
-        error: 'Network error occurred'
-      });
+      console.error('Roast generation failed:', error);
+      alert('Failed to roast this portfolio. Is it a valid URL?');
     } finally {
       setLoading(false);
     }
   };
 
-  const openParody = () => {
-    if (!result?.parodyUrl) return;
-    window.open(result.parodyUrl, '_blank');
-  };
-  
-  const openComparison = () => {
-    if (!result?.comparisonUrl) return;
-    window.open(result.comparisonUrl, '_blank');
-  };
-  
-  const downloadParody = () => {
-    if (!result?.downloadUrl) return;
-    window.open(result.downloadUrl, '_blank');
+  const togglePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="container mx-auto max-w-6xl">
-        <div className="text-center py-12">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            Website Parody Generator
+    <div className="min-h-screen bg-black flex p-4">
+      <div className={`${showPreview ? 'w-full lg:w-1/2' : 'max-w-2xl w-full mx-auto'} transition-all duration-500`}>
+        <div className="text-center mb-12">
+          <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500 mb-4">
+            PORTFOLIO ROASTER
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Transform any website into hilarious parodies with AI
+          <p className="text-xl text-gray-400">
+            Drop your tech portfolio URL and prepare to get cooked 🔥
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Generate Parody
-              </CardTitle>
-              <CardDescription>
-                Enter a website URL and choose a parody style to get started
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <label htmlFor="url" className="text-sm font-medium text-gray-700">
-                  Website URL
-                </label>
-                <Input
-                  id="url"
-                  placeholder="https://example.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="text-base"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="style" className="text-sm font-medium text-gray-700">
-                  Parody Style
-                </label>
-                <Select value={style} onValueChange={setStyle}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(PARODY_STYLES).map(([key, styleConfig]) => (
-                      <SelectItem key={key} value={key}>
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">{styleConfig.name}</span>
-                          <span className="text-xs text-gray-500">{styleConfig.examples}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Button 
-                onClick={generateParody} 
-                disabled={loading || !url}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating Parody...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate Parody
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>Preview Styles</CardTitle>
-              <CardDescription>
-                See what each parody style does to content
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(PARODY_STYLES).map(([key, styleConfig]) => (
-                  <div 
-                    key={key}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      style === key 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setStyle(key)}
-                  >
-                    <h3 className="font-semibold text-sm">{styleConfig.name}</h3>
-                    <p className="text-xs text-gray-600 mt-1">{styleConfig.systemPrompt}</p>
+        <Card className="bg-gray-900 border-gray-800">
+          <CardContent className="p-8 space-y-6">
+            <div className="space-y-2">
+              <Input
+                id="url"
+                placeholder="https://yourportfolio.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !loading && handleRoast()}
+                className="text-lg bg-gray-800 border-gray-700 text-white placeholder-gray-500 h-14"
+              />
+            </div>
+            
+            <Button 
+              onClick={handleRoast} 
+              disabled={loading || !url}
+              className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-bold text-xl h-16"
+              size="lg"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                  Preparing the roast...
+                </>
+              ) : (
+                <>
+                  <Flame className="mr-2 h-6 w-6" />
+                  ROAST THIS PORTFOLIO
+                </>
+              )}
+            </Button>
+            
+            {roast && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={togglePlayPause}
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-400 hover:bg-gray-700"
+                    >
+                      {isPlaying ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+                    </Button>
+                    <div>
+                      <p className="text-sm text-gray-400">Audio Roast</p>
+                      <p className="text-xs text-gray-500">Click to {isPlaying ? 'pause' : 'play'}</p>
+                    </div>
                   </div>
-                ))}
+                  <audio
+                    ref={audioRef}
+                    src={roast.audioUrl}
+                    onEnded={() => setIsPlaying(false)}
+                    className="hidden"
+                  />
+                </div>
+                
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-red-400 mb-3">
+                    The Roast {roast.portfolioName && `of ${roast.portfolioName}`}:
+                  </h3>
+                  <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                    {roast.text}
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      setRoast(null);
+                      setUrl('');
+                      setShowPreview(false);
+                    }}
+                    variant="outline"
+                    className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                  >
+                    Roast Another
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (roast.text) {
+                        navigator.clipboard.writeText(roast.text);
+                        alert('Roast copied to clipboard!');
+                      }
+                    }}
+                    variant="outline"
+                    className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                  >
+                    Copy Roast
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <p className="text-center text-gray-600 text-sm mt-8">
+          Made for fun. Don&apos;t take it personally. Or do. We&apos;re not your therapist.
+        </p>
+      </div>
+      
+      {/* Website Preview Sidebar */}
+      {showPreview && url && (
+        <div className="hidden lg:block w-1/2 pl-4">
+          <Card className="bg-gray-900 border-gray-800 h-full sticky top-4">
+            <CardContent className="p-4 h-full flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-400">Portfolio Preview</h3>
+                <Button
+                  onClick={() => window.open(url, '_blank')}
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-gray-300"
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Open
+                </Button>
+              </div>
+              <div className="bg-gray-800 rounded-lg overflow-hidden flex-1">
+                <iframe
+                  src={url}
+                  className="w-full h-full"
+                  title="Portfolio Preview"
+                  sandbox="allow-same-origin allow-scripts"
+                />
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {result && (
-          <Card className="mt-8 shadow-lg">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    {result.success ? (
-                      <>
-                        <Sparkles className="h-5 w-5 text-green-500" />
-                        Parody Generated!
-                      </>
-                    ) : (
-                      <>
-                        <div className="h-5 w-5 rounded-full bg-red-500" />
-                        Generation Failed
-                      </>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    {result.success 
-                      ? (
-                          <div className="space-y-2">
-                            <p>{result.summary}</p>
-                            <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
-                              <div>
-                                <span>Style: {PARODY_STYLES[result.style as keyof typeof PARODY_STYLES]?.name}</span>
-                                {result.captureStrategy && <div>Method: {result.captureStrategy}</div>}
-                              </div>
-                              {result.stats && (
-                                <div>
-                                  <div>Images: {result.stats.imagesTransformed}</div>
-                                  <div>Time: {(result.stats.totalProcessingTime / 1000).toFixed(1)}s</div>
-                                  <div>Size: {(result.stats.fileSize / 1024).toFixed(1)} KB</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      : (
-                          <div className="space-y-1">
-                            <p className="text-red-600">{result.error}</p>
-                            {result.errorType && <p className="text-xs text-gray-500">Type: {result.errorType}</p>}
-                          </div>
-                        )
-                    }
-                  </CardDescription>
-                </div>
-                {result.success && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={openParody} className="bg-green-600 hover:bg-green-700">
-                      🚀 Open Parody
-                    </Button>
-                    <Button onClick={openComparison} variant="outline">
-                      🔄 Compare
-                    </Button>
-                    <Button onClick={downloadParody} variant="outline">
-                      💾 Download
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            {result.success && result.blobUrl && (
-              <CardContent>
-                <div className="border rounded-lg overflow-hidden">
-                  <iframe
-                    src={result.blobUrl}
-                    className="w-full h-[400px]"
-                    title="Parody Preview"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  Preview • Click &quot;🚀 Open Parody&quot; for full experience
-                </p>
-              </CardContent>
-            )}
-          </Card>
-        )}
-      </div>
+      )}
     </div>
   );
 }
