@@ -38,12 +38,15 @@ ROASTING GUIDELINES:
 - Reference Silicon Valley culture and stereotypes
 - Use tech-specific burns (npm install personality, git commit -m "fixed life", etc.)
 - Be creative with programming metaphors
-- Length: 60-90 seconds when read aloud (about 150-250 words)
-- End with a backhanded compliment that's still a burn
-- Use modern slang and internet speak where appropriate
+- Length: 25-40 seconds when read aloud (about 80-120 words MAX)
+- START WITH YOUR BEST BURN - no warmup
+- Pack every sentence with comedy gold
+- End with a quick backhanded compliment
+- Use modern slang and internet speak
 - NO HOLDING BACK - this is comedy, not a code review
+- CONCISE AND DEVASTATING - quality over quantity
 
-Write the roast as a single flowing monologue, like a stand-up routine. Make it GENUINELY FUNNY, not just mean.`;
+Write the roast as a tight, punchy monologue. Every word counts. Make it GENUINELY FUNNY and BRUTAL from the first sentence.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -59,7 +62,7 @@ Write the roast as a single flowing monologue, like a stand-up routine. Make it 
         }
       ],
       temperature: 0.9,
-      max_tokens: 600,
+      max_tokens: 300, // Reduced for shorter roasts
       presence_penalty: 0.6,
       frequency_penalty: 0.3
     });

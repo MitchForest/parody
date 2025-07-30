@@ -1,4 +1,4 @@
-# Parody Site Generator - Current State Analysis & Complete Recreation Plan
+;# Parody Site Generator - Current State Analysis & Complete Recreation Plan
 
 ## Executive Summary
 

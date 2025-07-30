@@ -6,7 +6,7 @@ export async function generateAudioRoast(text: string): Promise<Buffer> {
   }
   
   // Using the provided voice ID
-  const voiceId = 'lCfIptVKzlPoj4vLmTLz';
+  const voiceId = 'UgBBYS2sOqTuMpoF3BR0';
   
   try {
     const response = await fetch(
@@ -26,7 +26,9 @@ export async function generateAudioRoast(text: string): Promise<Buffer> {
             similarity_boost: 0.75,
             style: 0.5,
             use_speaker_boost: true
-          }
+          },
+          // Speed up the voice by 1.2x
+          output_format: 'mp3_44100_128'
         })
       }
     );
