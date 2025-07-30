@@ -30,6 +30,10 @@ export default function Home() {
   // State for random portfolio selection
   const [usedPortfolios, setUsedPortfolios] = useState<Set<string>>(new Set());
   const [availablePortfolios, setAvailablePortfolios] = useState<string[]>([...PORTFOLIO_LINKS]);
+  
+  // State for slot machine animation
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [spinningUrl, setSpinningUrl] = useState('');
 
   const handleRoast = async () => {
     if (!url) return;
@@ -68,7 +72,30 @@ export default function Home() {
     }
   };
 
-  const selectRandomPortfolio = () => {
+  // Function to play a beep sound
+  const playBeep = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Configure the beep sound
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800Hz frequency
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); // Lower volume
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1); // Quick fade
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1); // 100ms beep
+    } catch (error) {
+      // Fallback for browsers that don't support Web Audio API
+      console.log('Beep sound not supported');
+    }
+  };
+
+  const selectRandomPortfolio = async () => {
     if (availablePortfolios.length === 0) {
       // All portfolios have been used, reset the list
       setUsedPortfolios(new Set());
@@ -77,14 +104,67 @@ export default function Home() {
       return;
     }
 
-    // Select random portfolio from available ones
-    const randomIndex = Math.floor(Math.random() * availablePortfolios.length);
-    const selectedPortfolio = availablePortfolios[randomIndex];
+    // Start the slot machine animation
+    setIsSpinning(true);
     
-    // Update states
-    setUrl(selectedPortfolio);
-    setUsedPortfolios(prev => new Set([...prev, selectedPortfolio]));
-    setAvailablePortfolios(prev => prev.filter(portfolio => portfolio !== selectedPortfolio));
+    // Pre-determine the winner from available portfolios
+    const randomIndex = Math.floor(Math.random() * availablePortfolios.length);
+    const winner = availablePortfolios[randomIndex];
+    
+    // Slot machine spinning with gradually increasing delays (casino effect)
+    const spinDelays = [80, 80, 100, 120, 150, 200, 280, 400, 600]; // milliseconds
+    
+    // Spin animation - cycle through random URLs
+    for (let i = 0; i < spinDelays.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, spinDelays[i]));
+      
+      // Show random URL from all portfolios during spin (not just available ones)
+      const randomSpinUrl = PORTFOLIO_LINKS[Math.floor(Math.random() * PORTFOLIO_LINKS.length)];
+      setSpinningUrl(randomSpinUrl);
+      
+      // Play beep sound for each spin (except the last one for dramatic effect)
+      if (i < spinDelays.length - 1) {
+        playBeep();
+      }
+    }
+    
+    // Final dramatic pause before revealing winner (no beep here for suspense)
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Reveal the winner with emphasis
+    setSpinningUrl(winner);
+    setUrl(winner);
+    
+    // Play a slightly different "winner" beep
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Higher pitched "winner" sound
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    } catch (error) {
+      console.log('Winner sound not supported');
+    }
+    
+    // Small delay to let the user see the final selection
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // End spinning animation
+    setIsSpinning(false);
+    setSpinningUrl('');
+    
+    // Update tracking state
+    setUsedPortfolios(prev => new Set([...prev, winner]));
+    setAvailablePortfolios(prev => prev.filter(portfolio => portfolio !== winner));
   };
 
   const resetPortfolioList = () => {
@@ -125,11 +205,23 @@ export default function Home() {
               <Input
                 id="url"
                 placeholder="https://yourportfolio.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !loading && handleRoast()}
-                className="text-lg bg-gray-800 border-gray-700 text-white placeholder-gray-500 h-14"
+                value={isSpinning ? spinningUrl : url}
+                onChange={(e) => !isSpinning && setUrl(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !loading && !isSpinning && handleRoast()}
+                disabled={isSpinning}
+                className={`text-lg bg-gray-800 border-gray-700 text-white placeholder-gray-500 h-14 transition-all duration-200 ${
+                  isSpinning 
+                    ? 'border-orange-500 shadow-lg shadow-orange-500/20 bg-gray-700 animate-pulse' 
+                    : 'hover:border-gray-600'
+                }`}
               />
+              {isSpinning && (
+                <div className="text-center">
+                  <span className="text-orange-400 text-sm font-medium animate-bounce">
+                    🎰 SPINNING... 🎰
+                  </span>
+                </div>
+              )}
             </div>
             
             {/* Random Portfolio Selection */}
@@ -137,16 +229,23 @@ export default function Home() {
               <div className="flex gap-3">
                 <Button 
                   onClick={selectRandomPortfolio}
-                  disabled={loading}
+                  disabled={loading || isSpinning}
                   variant="outline"
-                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                  className={`flex-1 border-gray-700 text-gray-300 hover:bg-gray-800 transition-all duration-200 ${
+                    isSpinning 
+                      ? 'border-orange-500 bg-orange-900/20 text-orange-300 animate-pulse shadow-lg shadow-orange-500/10' 
+                      : ''
+                  }`}
                 >
-                  <Shuffle className="mr-2 h-4 w-4" />
-                  Random Portfolio ({availablePortfolios.length} left)
+                  <Shuffle className={`mr-2 h-4 w-4 ${isSpinning ? 'animate-spin' : ''}`} />
+                  {isSpinning 
+                    ? 'SPINNING...' 
+                    : `Random Portfolio (${availablePortfolios.length} left)`
+                  }
                 </Button>
                 <Button 
                   onClick={resetPortfolioList}
-                  disabled={loading}
+                  disabled={loading || isSpinning}
                   variant="outline"
                   className="border-gray-700 text-gray-300 hover:bg-gray-800"
                   title="Reset portfolio list"
@@ -164,7 +263,7 @@ export default function Home() {
             
             <Button 
               onClick={handleRoast} 
-              disabled={loading || !url}
+              disabled={loading || !url || isSpinning}
               className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-bold text-xl h-16"
               size="lg"
             >
