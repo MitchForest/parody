@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 
 export interface DisplayResult {
   parodyUrl: string;
+  rawHtmlUrl: string;
   downloadUrl: string;
   comparisonUrl: string;
   previewId: string;
@@ -65,6 +66,7 @@ export class DisplayManager {
     
     return {
       parodyUrl: `/preview/${previewId}`,
+      rawHtmlUrl: `/api/preview/${previewId}`,
       downloadUrl: `/api/download/${previewId}`,
       comparisonUrl: `/preview/${comparisonId}`,
       previewId,

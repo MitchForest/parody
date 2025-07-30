@@ -435,6 +435,194 @@ export class SiteReconstructor {
           background: #000;
           color: #000;
         }
+      `,
+      
+      'gen-z-brainrot': `
+        /* Gen-Z Brainrot Theme */
+        * {
+          font-family: 'Inter', '-apple-system', sans-serif !important;
+        }
+        
+        body {
+          background: linear-gradient(45deg, #FF69B4, #00FFFF, #FFD700, #FF1493, #00FF00) !important;
+          background-size: 400% 400% !important;
+          animation: brainrotGradient 3s ease infinite !important;
+        }
+        
+        @keyframes brainrotGradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        
+        h1, h2, h3 {
+          color: #000 !important;
+          font-weight: 900 !important;
+          text-align: center !important;
+          text-transform: uppercase !important;
+          text-shadow: 3px 3px 0 #FF69B4, -1px -1px 0 #00FFFF !important;
+          animation: shake 0.5s infinite !important;
+        }
+        
+        @keyframes shake {
+          0% { transform: rotate(0deg); }
+          25% { transform: rotate(1deg); }
+          50% { transform: rotate(-1deg); }
+          75% { transform: rotate(1deg); }
+          100% { transform: rotate(0deg); }
+        }
+        
+        h1::after, h2::after {
+          content: " 💀";
+          animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        p {
+          background: rgba(255, 255, 255, 0.95) !important;
+          border: 3px solid #FF69B4 !important;
+          border-radius: 20px !important;
+          padding: 15px !important;
+          margin: 15px 0 !important;
+          box-shadow: 0 8px 32px rgba(255, 105, 180, 0.3) !important;
+          font-weight: 600 !important;
+        }
+        
+        p::before {
+          content: "💯 ";
+          font-size: 1.2em;
+        }
+        
+        img {
+          border-radius: 20px !important;
+          filter: saturate(2) contrast(1.3) hue-rotate(30deg) !important;
+          box-shadow: 0 8px 32px rgba(255, 105, 180, 0.4) !important;
+          animation: bounce 2s infinite !important;
+        }
+        
+        @keyframes bounce {
+          0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-10px); }
+          60% { transform: translateY(-5px); }
+        }
+        
+        button, .btn {
+          background: linear-gradient(45deg, #FF69B4, #00FFFF) !important;
+          border: none !important;
+          border-radius: 25px !important;
+          color: #000 !important;
+          font-weight: 900 !important;
+          padding: 15px 30px !important;
+          text-transform: uppercase !important;
+          box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4) !important;
+          animation: pulse 1s infinite !important;
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+      `,
+      
+      'infomercial': `
+        /* Infomercial Theme */
+        * {
+          font-family: 'Arial Black', Arial, sans-serif !important;
+        }
+        
+        body {
+          background: linear-gradient(180deg, #FFD700 0%, #FFA500 50%, #FF4500 100%) !important;
+          color: #000 !important;
+        }
+        
+        h1, h2, h3 {
+          color: #FF0000 !important;
+          text-align: center !important;
+          font-weight: 900 !important;
+          text-transform: uppercase !important;
+          text-shadow: 3px 3px 0 #FFFF00, -1px -1px 0 #FF0000 !important;
+          border: 5px solid #FF0000 !important;
+          background: #FFFF00 !important;
+          padding: 20px !important;
+          margin: 20px 0 !important;
+          animation: flash 1s infinite alternate !important;
+        }
+        
+        @keyframes flash {
+          0% { background: #FFFF00; }
+          100% { background: #FFD700; }
+        }
+        
+        h1::before {
+          content: "🔥 BUT WAIT! 🔥 ";
+          color: #FF0000;
+        }
+        
+        h1::after, h2::after {
+          content: " 🔥 AMAZING! 🔥";
+          color: #FF0000;
+        }
+        
+        p {
+          background: rgba(255, 255, 255, 0.95) !important;
+          border: 3px solid #FF0000 !important;
+          border-radius: 15px !important;
+          padding: 20px !important;
+          margin: 20px 0 !important;
+          box-shadow: 0 0 20px rgba(255, 0, 0, 0.3) !important;
+          font-weight: bold !important;
+          font-size: 1.1em !important;
+        }
+        
+        p::before {
+          content: "👉 INCREDIBLE: ";
+          color: #FF0000;
+          font-weight: 900;
+        }
+        
+        img {
+          border: 5px solid #FF0000 !important;
+          border-radius: 15px !important;
+          filter: saturate(1.5) contrast(1.2) brightness(1.1) !important;
+          box-shadow: 0 0 30px rgba(255, 0, 0, 0.5) !important;
+          animation: zoom 2s infinite alternate !important;
+        }
+        
+        @keyframes zoom {
+          0% { transform: scale(1); }
+          100% { transform: scale(1.05); }
+        }
+        
+        button, .btn {
+          background: linear-gradient(45deg, #FF0000, #FF4500) !important;
+          border: 3px solid #FFFF00 !important;
+          border-radius: 25px !important;
+          color: #FFFF00 !important;
+          font-weight: 900 !important;
+          text-transform: uppercase !important;
+          padding: 20px 40px !important;
+          font-size: 1.2em !important;
+          box-shadow: 0 8px 0 #CC0000, 0 8px 20px rgba(255, 0, 0, 0.4) !important;
+          animation: buttonPulse 0.5s infinite alternate !important;
+        }
+        
+        @keyframes buttonPulse {
+          0% { transform: translateY(0); box-shadow: 0 8px 0 #CC0000, 0 8px 20px rgba(255, 0, 0, 0.4); }
+          100% { transform: translateY(2px); box-shadow: 0 6px 0 #CC0000, 0 6px 15px rgba(255, 0, 0, 0.4); }
+        }
+        
+        button::before, .btn::before {
+          content: "💥 ";
+        }
+        
+        button::after, .btn::after {
+          content: " 💥";
+        }
       `
     };
 

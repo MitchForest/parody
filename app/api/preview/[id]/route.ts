@@ -5,38 +5,25 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+  
   try {
-    const { id } = await params;
-    
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Parody ID is required' },
-        { status: 400 }
-      );
-    }
-
     const parody = await displayManager.getParody(id);
     
     if (!parody) {
-      return NextResponse.json(
-        { error: 'Parody not found or expired' },
-        { status: 404 }
-      );
+      return new NextResponse('Parody not found', { status: 404 });
     }
-
-    return NextResponse.json({
-      html: parody.html,
-      originalUrl: parody.originalUrl,
-      style: parody.style,
-      createdAt: parody.createdAt,
-      metadata: parody.metadata
+    
+    // Return the raw HTML content directly
+    return new NextResponse(parody.html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'X-Robots-Tag': 'noindex, nofollow' // Don't index parody content
+      }
     });
-
   } catch (error) {
-    console.error('Preview API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Failed to serve parody:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

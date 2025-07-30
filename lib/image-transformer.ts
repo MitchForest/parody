@@ -83,7 +83,7 @@ export class ImageTransformer {
     // Use DALL-E for hero images and content images that need high quality
     // Use Replicate for faster/cheaper transformations
     return (context === 'hero' || context === 'content') && 
-           (style === 'simpsons' || style === 'medieval' || style === 'conspiracy');
+           (style === 'simpsons' || style === 'medieval' || style === 'conspiracy' || style === 'infomercial');
   }
 
   private async transformWithDallE(
@@ -161,17 +161,23 @@ export class ImageTransformer {
         background: "Modern corporate office space. Glass buildings, meeting rooms, professional environment.",
         icon: "Corporate business icon. Professional, clean, business-themed symbol."
       },
-      'gen-z': {
-        hero: "Gen-Z style photo. Phone selfie, ring light, aesthetic background, trendy outfit, social media ready.",
-        content: "Gen-Z aesthetic image. Colorful, trendy, social media style, phone photography, good lighting.",
-        background: "Aesthetic Gen-Z background. Neon lights, trendy decor, Instagram-worthy setting.",
-        icon: "Gen-Z style icon. Colorful, trendy, social media inspired design."
+      'gen-z-brainrot': {
+        hero: "Gen-Z TikTok style photo. Phone selfie, ring light, aesthetic background, trendy outfit, social media ready, brainrot energy.",
+        content: "Gen-Z brainrot aesthetic image. Colorful, chaotic, TikTok style, phone photography, meme energy, Ohio vibes.",
+        background: "Chaotic Gen-Z background. Neon lights, meme references, TikTok aesthetic, skibidi energy.",
+        icon: "Gen-Z brainrot icon. Colorful, meme-inspired, TikTok style, chaotic design."
       },
       'medieval': {
         hero: "Medieval illuminated manuscript portrait. Gold leaf, ornate borders, period clothing, manuscript art style.",
         content: "Medieval tapestry or manuscript illustration. Rich colors, gold details, period-appropriate imagery.",
         background: "Medieval castle or monastery setting. Stone walls, tapestries, period architecture.",
         icon: "Medieval heraldic symbol. Shield, sword, crown, ornate medieval design."
+      },
+      'infomercial': {
+        hero: "Infomercial style portrait. Overly enthusiastic person pointing, bright studio lighting, cheesy smile, television commercial aesthetic.",
+        content: "Infomercial product demonstration. Before/after style, bright lighting, dramatic arrows, exclamation points, TV commercial style.",
+        background: "Bright infomercial studio set. Blue screen, studio lighting, cheesy TV commercial background.",
+        icon: "Infomercial style icon. Bright colors, exclamation point, dramatic arrow, TV commercial design."
       },
       'conspiracy': {
         hero: "Conspiracy theory style photo. Grainy, low quality, mysterious lighting, red string bulletin board background.",
@@ -192,8 +198,9 @@ export class ImageTransformer {
     const basePrompts = {
       'simpsons': "simpsons character, yellow skin, cartoon style, matt groening art, springfield",
       'corporate-buzzword': "corporate stock photo, business professional, office setting, polished",
-      'gen-z': "gen-z aesthetic, social media style, trendy, colorful, phone photography",
+      'gen-z-brainrot': "gen-z brainrot, tiktok aesthetic, meme style, chaotic, colorful, ohio vibes",
       'medieval': "medieval manuscript, illuminated art, tapestry style, gold details",
+      'infomercial': "infomercial style, tv commercial, bright lighting, cheesy, dramatic, before after",
       'conspiracy': "conspiracy theory, grainy photo, mysterious, bulletin board, red strings"
     };
 

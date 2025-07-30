@@ -17,12 +17,25 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
       notFound();
     }
     
-    // Return the raw HTML content
+    // Use an iframe to display the complete HTML document
+    // This prevents hydration issues and allows full HTML rendering
+    const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(parody.html)}`;
+    
     return (
-      <div 
-        dangerouslySetInnerHTML={{ __html: parody.html }}
-        style={{ width: '100%', height: '100vh' }}
-      />
+      <div style={{ width: '100%', height: '100vh', margin: 0, padding: 0 }}>
+        <iframe
+          src={dataUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            margin: 0,
+            padding: 0
+          }}
+          title="Parody Preview"
+          sandbox="allow-scripts allow-same-origin"
+        />
+      </div>
     );
   } catch (error) {
     console.error('Failed to load parody:', error);

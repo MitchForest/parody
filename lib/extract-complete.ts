@@ -432,7 +432,12 @@ function getElementSelector($elem: any): string {
 
 function getDataAttributes($elem: any): Record<string, string> {
   const dataAttrs: Record<string, string> = {};
-  const attributes = $elem.get(0)?.attribs || {};
+  const element = $elem.get(0);
+  const attributes = element?.attribs;
+  
+  if (!attributes) {
+    return dataAttrs;
+  }
   
   Object.keys(attributes).forEach(key => {
     if (key.startsWith('data-')) {
