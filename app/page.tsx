@@ -42,7 +42,7 @@ export default function Home() {
       // Auto-play the audio with 1.2x speed
       setTimeout(() => {
         if (audioRef.current) {
-          audioRef.current.playbackRate = 1.2; // Speed up by 1.2x
+          audioRef.current.playbackRate = 1.15; // Speed up by 15%
           audioRef.current.play();
           setIsPlaying(true);
         }
@@ -60,7 +60,7 @@ export default function Home() {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        audioRef.current.playbackRate = 1.2; // Maintain speed
+        audioRef.current.playbackRate = 1.15; // Maintain 15% speed boost
         audioRef.current.play();
       }
       setIsPlaying(!isPlaying);
@@ -124,7 +124,7 @@ export default function Home() {
                       {isPlaying ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
                     </Button>
                     <div>
-                      <p className="text-sm text-gray-400">Audio Roast (1.2x speed)</p>
+                      <p className="text-sm text-gray-400">Audio Roast (1.15x speed)</p>
                       <p className="text-xs text-gray-500">Click to {isPlaying ? 'pause' : 'play'}</p>
                     </div>
                   </div>
