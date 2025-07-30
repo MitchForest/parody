@@ -1,144 +1,131 @@
 import OpenAI from 'openai';
 import Replicate from 'replicate';
-import { ParodyStyleKey } from './styles';
-import { CompleteExtraction } from './extract-complete';
+import { ParodyStyleKey } from '@/lib/styles';
 
-export interface TransformedImage {
-  originalSrc: string;
-  transformedUrl: string;
-  context: 'hero' | 'content' | 'background' | 'icon' | 'logo';
-  style: ParodyStyleKey;
-  method: 'dalle3' | 'replicate' | 'cached';
+export interface TransformationResult {
+  url: string;
+  originalUrl: string;
+  context: 'hero' | 'content' | 'background' | 'icon';
+  transformedAt: Date;
+  model: 'dalle-3' | 'replicate' | 'cached';
 }
 
 export class ImageTransformer {
   private openai: OpenAI;
   private replicate: Replicate;
-  private cache: Map<string, string> = new Map();
+  private cache = new Map<string, string>(); // Simple in-memory cache
 
   constructor() {
-    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    this.replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-  }
-
-  async transformAllImages(
-    images: CompleteExtraction['images'],
-    style: ParodyStyleKey,
-    maxImages: number = 5
-  ): Promise<TransformedImage[]> {
-    console.log(`🎨 Transforming ${Math.min(images.length, maxImages)} images to ${style} style...`);
-
-    const transformPromises = images
-      .slice(0, maxImages) // Limit for cost control
-      .map(async (img) => {
-        try {
-          const transformedUrl = await this.transformImage(img.src, style, img.context);
-          return {
-            originalSrc: img.src,
-            transformedUrl,
-            context: img.context,
-            style,
-            method: 'dalle3' as const
-          };
-        } catch (error) {
-          console.warn(`Failed to transform image ${img.src}:`, error);
-          // Return original as fallback
-          return {
-            originalSrc: img.src,
-            transformedUrl: img.src,
-            context: img.context,
-            style,
-            method: 'cached' as const
-          };
-        }
-      });
-
-    const results = await Promise.all(transformPromises);
-    console.log(`✅ Transformed ${results.length} images successfully`);
-    return results;
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!
+    });
+    
+    this.replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN!
+    });
   }
 
   async transformImage(
     imageUrl: string,
     style: ParodyStyleKey,
-    context: 'hero' | 'content' | 'background' | 'icon' | 'logo'
-  ): Promise<string> {
-    // Check cache first
+    context: 'hero' | 'content' | 'background' | 'icon'
+  ): Promise<TransformationResult> {
     const cacheKey = `${imageUrl}-${style}-${context}`;
+    
+    // Check cache first
     if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)!;
+      return {
+        url: this.cache.get(cacheKey)!,
+        originalUrl: imageUrl,
+        context,
+        transformedAt: new Date(),
+        model: 'cached'
+      };
     }
 
-    console.log(`   Transforming ${context} image to ${style} style...`);
+    try {
+      let transformedUrl: string;
+      let model: 'dalle-3' | 'replicate';
 
-    let transformedUrl: string;
+      // Choose transformation method based on context and style
+      if (this.shouldUseDallE(style, context)) {
+        transformedUrl = await this.transformWithDallE(imageUrl, style, context);
+        model = 'dalle-3';
+      } else {
+        transformedUrl = await this.transformWithReplicate(imageUrl, style, context);
+        model = 'replicate';
+      }
 
-    // Use different transformation methods based on style and context
-    if (this.shouldUseDallE3(style, context)) {
-      transformedUrl = await this.transformWithDallE3(imageUrl, style, context);
-    } else {
-      transformedUrl = await this.transformWithReplicate(imageUrl, style, context);
+      // Cache the result
+      this.cache.set(cacheKey, transformedUrl);
+
+      return {
+        url: transformedUrl,
+        originalUrl: imageUrl,
+        context,
+        transformedAt: new Date(),
+        model
+      };
+    } catch (error) {
+      console.error('Image transformation failed:', error);
+      // Return original URL as fallback
+      return {
+        url: imageUrl,
+        originalUrl: imageUrl,
+        context,
+        transformedAt: new Date(),
+        model: 'cached'
+      };
     }
-
-    // Cache the result
-    this.cache.set(cacheKey, transformedUrl);
-    return transformedUrl;
   }
 
-  private shouldUseDallE3(style: ParodyStyleKey, context: string): boolean {
-    // Use DALL-E 3 for hero images and important content
-    if (context === 'hero' || context === 'logo') return true;
-    
-    // Use DALL-E 3 for Simpsons style (best quality)
-    if (style === 'simpsons') return true;
-    
-    // Use Replicate for other cases (faster/cheaper)
-    return false;
+  private shouldUseDallE(style: ParodyStyleKey, context: string): boolean {
+    // Use DALL-E for hero images and content images that need high quality
+    // Use Replicate for faster/cheaper transformations
+    return (context === 'hero' || context === 'content') && 
+           (style === 'simpsons' || style === 'medieval' || style === 'conspiracy');
   }
 
-  private async transformWithDallE3(
-    imageUrl: string,
-    style: ParodyStyleKey,
+  private async transformWithDallE(
+    imageUrl: string, 
+    style: ParodyStyleKey, 
     context: string
   ): Promise<string> {
-    const prompt = this.generateDallE3Prompt(style, context);
+    const prompt = this.buildDallEPrompt(style, context);
     
     try {
       const response = await this.openai.images.generate({
         model: "dall-e-3",
         prompt,
         n: 1,
-        size: this.getDallE3Size(context),
-        quality: "hd",
+        size: this.getDallESize(context),
+        quality: "standard",
         response_format: "url"
       });
 
-      const imageUrl = response.data[0]?.url;
-      if (!imageUrl) {
-        throw new Error('No image URL returned from DALL-E 3');
+      if (response.data && response.data[0] && response.data[0].url) {
+        return response.data[0].url;
       }
-
-      console.log(`   ✅ DALL-E 3 generated ${context} image`);
-      return imageUrl;
+      throw new Error('No image URL returned from DALL-E');
     } catch (error) {
-      console.error('DALL-E 3 transformation failed:', error);
+      console.error('DALL-E generation failed:', error);
       throw error;
     }
   }
 
   private async transformWithReplicate(
     imageUrl: string,
-    style: ParodyStyleKey,
+    style: ParodyStyleKey, 
     context: string
   ): Promise<string> {
-    const prompt = this.generateReplicatePrompt(style, context);
-    
     try {
       // Download the original image first
       const imageBuffer = await this.downloadImage(imageUrl);
       const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
 
-      // Use img2img transformation with Stable Diffusion
+      const prompt = this.buildReplicatePrompt(style, context);
+      
+      // Use Stable Diffusion img2img for style transfer
       const output = await this.replicate.run(
         "stability-ai/stable-diffusion-img2img:15a3689ee13b0d2616e98820eca31d4c3abcd36672df6afce5cb6feb1d66087d",
         {
@@ -147,139 +134,173 @@ export class ImageTransformer {
             image: base64Image,
             strength: this.getTransformationStrength(style, context),
             guidance_scale: 7.5,
-            num_inference_steps: 20, // Balance quality vs speed
-            scheduler: "K_EULER"
+            num_inference_steps: 30,
+            seed: Math.floor(Math.random() * 1000000)
           }
         }
-      );
+      ) as string[];
 
-      const transformedUrl = Array.isArray(output) ? output[0] : output;
-      console.log(`   ✅ Replicate generated ${context} image`);
-      return transformedUrl as string;
+      return output[0];
     } catch (error) {
       console.error('Replicate transformation failed:', error);
       throw error;
     }
   }
 
-  private generateDallE3Prompt(style: ParodyStyleKey, context: string): string {
-    const basePrompts = {
-      simpsons: {
-        hero: "Portrait of a person in The Simpsons cartoon style, yellow skin, big round eyes, overbite, spiky hair, Springfield background, Matt Groening art style, high quality animation",
-        logo: "Company logo transformed into The Simpsons cartoon style, yellow and bright colors, cartoon aesthetic, Springfield theme",
-        content: "Image in The Simpsons cartoon style, bright colors, cartoon shading, Springfield setting",
-        background: "Springfield cityscape background from The Simpsons, cartoon style, bright blue sky, yellow buildings",
-        icon: "Simple icon in The Simpsons cartoon style, yellow and bright colors, minimal design"
+  private buildDallEPrompt(style: ParodyStyleKey, context: string): string {
+    const stylePrompts = {
+      'simpsons': {
+        hero: "Create a Simpsons character portrait in Matt Groening's art style. Yellow skin, big eyes, overbite, simple cartoon lines. Springfield setting background.",
+        content: "Transform into Simpsons cartoon style. Yellow color scheme, simple cartoon art, Matt Groening style illustration.",
+        background: "Springfield cityscape in Simpsons art style. Nuclear plant, colorful cartoon buildings, clear sky.",
+        icon: "Simple Simpsons-style icon. Yellow and bright colors, cartoon style, minimal design."
       },
       'corporate-buzzword': {
-        hero: "Professional corporate headshot, business suit, office background, stock photo style, high-end professional photography",
-        logo: "Corporate logo design, modern business style, professional blue and gray colors, enterprise branding",
-        content: "Professional business image, corporate setting, office environment, business people in suits",
-        background: "Modern corporate office background, glass buildings, professional business environment",
-        icon: "Professional business icon, corporate style, clean modern design"
+        hero: "Professional corporate headshot. Person in business suit, office background, stock photo style, overly polished.",
+        content: "Corporate stock photo style. Business people, office setting, handshakes, meetings, professional lighting.",
+        background: "Modern corporate office space. Glass buildings, meeting rooms, professional environment.",
+        icon: "Corporate business icon. Professional, clean, business-themed symbol."
       },
-      'gen-z-brainrot': {
-        hero: "Person taking selfie with phone, TikTok aesthetic, neon colors, social media style, Gen Z fashion",
-        logo: "Logo with meme aesthetic, viral social media style, bright neon colors, internet culture",
-        content: "Social media style image, TikTok aesthetic, phone screen, viral content style",
-        background: "Neon lit room background, gaming setup, social media aesthetic, colorful LED lights",
-        icon: "Social media app icon style, bright colors, mobile app aesthetic"
+      'gen-z': {
+        hero: "Gen-Z style photo. Phone selfie, ring light, aesthetic background, trendy outfit, social media ready.",
+        content: "Gen-Z aesthetic image. Colorful, trendy, social media style, phone photography, good lighting.",
+        background: "Aesthetic Gen-Z background. Neon lights, trendy decor, Instagram-worthy setting.",
+        icon: "Gen-Z style icon. Colorful, trendy, social media inspired design."
       },
-      medieval: {
-        hero: "Medieval portrait, renaissance painting style, royal clothing, castle background, illuminated manuscript art",
-        logo: "Medieval heraldic emblem, coat of arms style, castle and knight theme, gothic lettering",
-        content: "Medieval scene, castle setting, renaissance art style, historical painting",
-        background: "Medieval castle background, gothic architecture, renaissance painting style",
-        icon: "Medieval heraldic symbol, shield and sword, gothic design"
+      'medieval': {
+        hero: "Medieval illuminated manuscript portrait. Gold leaf, ornate borders, period clothing, manuscript art style.",
+        content: "Medieval tapestry or manuscript illustration. Rich colors, gold details, period-appropriate imagery.",
+        background: "Medieval castle or monastery setting. Stone walls, tapestries, period architecture.",
+        icon: "Medieval heraldic symbol. Shield, sword, crown, ornate medieval design."
       },
-      infomercial: {
-        hero: "Enthusiastic spokesperson, bright studio lighting, cheesy smile, pointing gesture, infomercial style",
-        logo: "Infomercial product logo, bright colors, 'AS SEEN ON TV' style, marketing graphics",
-        content: "Product demonstration, infomercial style, bright studio lighting, marketing photography",
-        background: "Bright studio background, infomercial set, promotional graphics",
-        icon: "Product icon, marketing style, bright promotional colors"
-      },
-      conspiracy: {
-        hero: "Mysterious person, shadowy lighting, bulletin board background, investigation aesthetic",
-        logo: "Conspiracy theory style logo, mystery aesthetic, dark colors, investigation theme",
-        content: "Investigation scene, bulletin board with red string, conspiracy aesthetic, documentary style",
-        background: "Dark room with bulletin board, red string connections, investigation aesthetic",
-        icon: "Mystery icon, conspiracy style, magnifying glass, investigation theme"
+      'conspiracy': {
+        hero: "Conspiracy theory style photo. Grainy, low quality, mysterious lighting, red string bulletin board background.",
+        content: "Conspiracy theory aesthetic. Blurry photos, red strings, bulletin boards, mysterious documents.",
+        background: "Conspiracy theory room. Cork board with red strings, newspaper clippings, dim lighting.",
+        icon: "Conspiracy symbol. Eye, pyramid, mysterious symbol, monochrome design."
       }
     };
 
-    return basePrompts[style]?.[context] || basePrompts[style]?.content || "High quality image";
+    const styleData = stylePrompts[style as keyof typeof stylePrompts];
+    if (!styleData) return `Transform into ${style} style image appropriate for ${context}`;
+    
+    const prompt = styleData[context as keyof typeof styleData];
+    return prompt || `Transform into ${style} style image appropriate for ${context}`;
   }
 
-  private generateReplicatePrompt(style: ParodyStyleKey, context: string): string {
-    const stylePrompts = {
-      simpsons: "simpsons cartoon style, yellow skin, matt groening art, animated",
-      'corporate-buzzword': "professional corporate style, business suit, office setting",
-      'gen-z-brainrot': "tiktok aesthetic, neon colors, social media style, viral content",
-      medieval: "medieval renaissance style, castle setting, historical painting",
-      infomercial: "bright infomercial style, marketing photography, studio lighting",
-      conspiracy: "conspiracy theory aesthetic, investigation style, documentary photography"
+  private buildReplicatePrompt(style: ParodyStyleKey, context: string): string {
+    const basePrompts = {
+      'simpsons': "simpsons character, yellow skin, cartoon style, matt groening art, springfield",
+      'corporate-buzzword': "corporate stock photo, business professional, office setting, polished",
+      'gen-z': "gen-z aesthetic, social media style, trendy, colorful, phone photography",
+      'medieval': "medieval manuscript, illuminated art, tapestry style, gold details",
+      'conspiracy': "conspiracy theory, grainy photo, mysterious, bulletin board, red strings"
     };
 
-    return stylePrompts[style] || "high quality, professional";
+    const contextModifiers = {
+      hero: "portrait, main character, detailed, high quality",
+      content: "scene, detailed illustration, thematic",
+      background: "background, environmental, atmospheric",
+      icon: "simple, iconic, minimal, symbolic"
+    };
+
+    const basePrompt = basePrompts[style as keyof typeof basePrompts] || style;
+    const contextMod = contextModifiers[context as keyof typeof contextModifiers] || context;
+    return `${basePrompt}, ${contextMod}, high quality, detailed`;
   }
 
-  private getDallE3Size(context: string): "1024x1024" | "1792x1024" | "1024x1792" {
+  private getDallESize(context: string): "1024x1024" | "1792x1024" | "1024x1792" {
     switch (context) {
       case 'hero':
-        return "1792x1024"; // Wide hero format
+        return "1792x1024"; // Wide format for hero images
       case 'background':
-        return "1792x1024"; // Wide background
+        return "1792x1024"; // Wide format for backgrounds
       default:
-        return "1024x1024"; // Square for most content
+        return "1024x1024"; // Square for content and icons
     }
   }
 
   private getTransformationStrength(style: ParodyStyleKey, context: string): number {
-    // Higher strength = more transformation, lower = preserve more original
-    const strengths = {
-      simpsons: {
-        hero: 0.8, // High transformation for cartoon effect
-        content: 0.7,
-        background: 0.6,
-        icon: 0.5,
-        logo: 0.7
-      },
-      'corporate-buzzword': {
-        hero: 0.6, // Moderate transformation
-        content: 0.5,
-        background: 0.4,
-        icon: 0.3,
-        logo: 0.5
-      },
-      // Add other styles as needed
+    // How much to transform the original image (0.0 = no change, 1.0 = complete transformation)
+    const strengthMap = {
+      'simpsons': { hero: 0.8, content: 0.7, background: 0.6, icon: 0.9 },
+      'corporate-buzzword': { hero: 0.5, content: 0.4, background: 0.3, icon: 0.6 },
+      'gen-z': { hero: 0.6, content: 0.5, background: 0.4, icon: 0.7 },
+      'medieval': { hero: 0.8, content: 0.7, background: 0.6, icon: 0.9 },
+      'conspiracy': { hero: 0.7, content: 0.6, background: 0.5, icon: 0.8 }
     };
 
-    return strengths[style]?.[context] || 0.6; // Default strength
+    const styleData = strengthMap[style as keyof typeof strengthMap];
+    if (!styleData) return 0.6;
+    
+    return styleData[context as keyof typeof styleData] || 0.6;
   }
 
   private async downloadImage(url: string): Promise<Buffer> {
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to download image: ${response.status}`);
+        throw new Error(`Failed to download image: ${response.statusText}`);
       }
       
       const arrayBuffer = await response.arrayBuffer();
       return Buffer.from(arrayBuffer);
     } catch (error) {
-      console.error('Image download failed:', error);
+      console.error('Failed to download image:', error);
       throw error;
     }
   }
+
+  async transformMultipleImages(
+    images: Array<{
+      url: string;
+      context: 'hero' | 'content' | 'background' | 'icon';
+    }>,
+    style: ParodyStyleKey
+  ): Promise<TransformationResult[]> {
+    // Transform images in parallel with a concurrency limit
+    const concurrencyLimit = 3;
+    const results: TransformationResult[] = [];
+    
+    for (let i = 0; i < images.length; i += concurrencyLimit) {
+      const batch = images.slice(i, i + concurrencyLimit);
+      const batchResults = await Promise.all(
+        batch.map(img => this.transformImage(img.url, style, img.context))
+      );
+      results.push(...batchResults);
+    }
+    
+    return results;
+  }
+
+  // Clear cache method for memory management
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  // Get cache stats
+  getCacheStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
+  }
 }
 
-// Convenience function for single image transformation
-export async function transformSingleImage(
-  imageUrl: string,
-  style: ParodyStyleKey,
-  context: 'hero' | 'content' | 'background' | 'icon' | 'logo' = 'content'
-): Promise<string> {
-  const transformer = new ImageTransformer();
-  return transformer.transformImage(imageUrl, style, context);
+// Utility function to validate image URLs
+export function isValidImageUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+    const hasValidExtension = validExtensions.some(ext => 
+      urlObj.pathname.toLowerCase().endsWith(ext)
+    );
+    
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:' || hasValidExtension;
+  } catch {
+    return false;
+  }
 }
+
+// Export singleton instance
+export const imageTransformer = new ImageTransformer();

@@ -17,7 +17,8 @@ function normalizeUrl(url: string): string {
 // NOTE: Browserless function now imported from browserless-correct.ts
 
 // Strategy 2: Playwright-based local capture (Secondary)
-async function playwrightCapture(url: string): Promise<CaptureResult> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function playwrightCapture(_url: string): Promise<CaptureResult> {
   throw new Error('Playwright capture not implemented yet - use html-only fallback');
 }
 
@@ -81,8 +82,8 @@ async function htmlOnlyCapture(url: string): Promise<CaptureResult> {
   // Create a realistic 1024x768 dummy screenshot
   const createDummyScreenshot = () => {
     // This creates a minimal valid PNG with website-like dimensions
-    const width = 1024;
-    const height = 768;
+    // const width = 1024;
+    // const height = 768;
     
     // Create basic PNG header for a 1024x768 white image
     return Buffer.from([

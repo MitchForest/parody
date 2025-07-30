@@ -730,3 +730,414 @@ window.open(parodyUrl, '_blank');
 ```
 
 This plan leverages our existing Browserless and API keys, builds on our current codebase, and creates a complete website recreation system that truly transforms the entire site, not just the text.
+
+---
+
+## CRITICAL FIXES NEEDED TO MAKE IT WORK
+
+### Fix 1: Import Path Corrections
+
+**Problem**: All new files import from `@/config/parody-styles` which doesn't exist
+**Solution**: Change ALL imports to use correct paths
+
+```typescript
+// WRONG (in all new files):
+import { ParodyStyleKey } from '@/config/parody-styles';
+
+// CORRECT:
+import { ParodyStyleKey } from '@/lib/styles';
+```
+
+### Fix 2: Type Compatibility Issues
+
+**Problem**: CompleteExtraction extends ExtractedContent but missing required properties
+**Solution**: Remove the extends and make it standalone
+
+```typescript
+// lib/extract-complete.ts
+// REMOVE: export interface CompleteExtraction extends ExtractedContent
+// REPLACE WITH:
+export interface CompleteExtraction {
+  // All the properties we need
+  title: string;
+  headings: { h1: string[]; h2: string[]; h3: string[] };
+  paragraphs: string[];
+  navigation: Array<{ text: string; href?: string }>;
+  buttons: string[];
+  images: Array<{...}>;
+  videos: Array<{...}>;
+  // ... rest of properties
+}
+```
+
+### Fix 3: Cheerio Type Errors
+
+**Problem**: `cheerio.Element` namespace errors
+**Solution**: Use proper Cheerio types
+
+```typescript
+// WRONG:
+const getSelector = (el: cheerio.Element): string => {
+
+// CORRECT:
+import { Cheerio, AnyNode } from 'cheerio';
+const getSelector = (el: AnyNode): string => {
+```
+
+### Fix 4: Missing DisplayManager Methods
+
+**Problem**: `getStoredParody` method doesn't exist
+**Solution**: Add the method or remove the route that uses it
+
+```typescript
+// lib/display-manager.ts
+class DisplayManager {
+  async getStoredParody(id: string): Promise<string | null> {
+    // For now, just return null
+    return null;
+  }
+}
+```
+
+### Fix 5: Index Type Errors
+
+**Problem**: ParodyStyleKey can't be used as index
+**Solution**: Add proper type assertions
+
+```typescript
+// WRONG:
+const prompt = stylePrompts[style][context];
+
+// CORRECT:
+const prompt = (stylePrompts as any)[style][context];
+// OR better:
+const styleData = stylePrompts[style as keyof typeof stylePrompts];
+const prompt = styleData[context as keyof typeof styleData];
+```
+
+### Fix 6: API Response Structure
+
+**Problem**: Server crashes due to missing properties
+**Solution**: Ensure all expected properties exist
+
+```typescript
+// In captureWithFallbacks return:
+return {
+  screenshot: Buffer.from([]), // Empty buffer if no screenshot
+  html: htmlContent,
+  strategy: strategyName
+};
+```
+
+### Fix 7: Simplify Initial Implementation
+
+**Problem**: Too many moving parts failing at once
+**Solution**: Start with minimal working version
+
+```typescript
+// app/api/generate-parody/route.ts - SIMPLIFIED VERSION
+export async function POST(req: NextRequest) {
+  const { url, style } = await req.json();
+  
+  // 1. Capture
+  const { html } = await captureWithFallbacks(url);
+  
+  // 2. Basic extraction (use existing working one)
+  const content = extractContent(html);
+  
+  // 3. Transform text (already working)
+  const parodyContent = await generateParody(content, style);
+  
+  // 4. For now, skip image transformation
+  // 5. Return simple HTML with transformed text
+  const simpleHtml = generateHTML(content, parodyContent);
+  
+  return NextResponse.json({
+    success: true,
+    html: simpleHtml,
+    previewUrl: `data:text/html;base64,${Buffer.from(simpleHtml).toString('base64')}`
+  });
+}
+```
+
+### Fix 8: File Dependencies Order
+
+**Correct order to fix files:**
+1. Fix `lib/styles.ts` exports
+2. Fix `lib/extract-complete.ts` (types and imports)
+3. Fix `lib/image-transformer.ts` (imports and type assertions)
+4. Fix `lib/site-reconstructor.ts` (imports)
+5. Fix `lib/display-manager.ts` (add missing methods)
+6. Finally fix `app/api/generate-parody/route.ts`
+
+### Fix 9: Add Missing Exports
+
+```typescript
+// lib/image-transformer.ts
+export const imageTransformer = new ImageTransformer();
+
+// lib/site-reconstructor.ts
+export const siteReconstructor = new SiteReconstructor();
+
+// lib/display-manager.ts
+export const displayManager = new DisplayManager();
+```
+
+### Fix 10: Environment Variables Check
+
+**Add to route.ts:**
+```typescript
+// Check required env vars
+if (!process.env.OPENAI_API_KEY) {
+  return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+}
+if (!process.env.REPLICATE_API_TOKEN) {
+  console.warn('Replicate API token not configured - image transformation disabled');
+}
+```
+
+### Minimal Working Test Flow
+
+1. **Test basic capture**: Just verify HTML comes back
+2. **Test extraction**: Log what's found, don't transform yet
+3. **Test text transformation**: Already works
+4. **Skip image transformation initially**: Get everything else working first
+5. **Return simple preview**: Use data URL for immediate testing
+
+### Quick Validation Commands
+
+```bash
+# 1. Check TypeScript errors
+bun run typecheck
+
+# 2. Test basic API (should not crash)
+curl -X POST http://localhost:3000/api/generate-parody \
+  -H "Content-Type: application/json" \
+  -d '{"url": "example.com", "style": "simpsons"}'
+
+# 3. Check console logs
+# Should see capture working, extraction working, text transform working
+```
+
+### Emergency Fallback
+
+If still not working, revert to original working version:
+1. Keep using original `extract.ts` (not extract-complete)
+2. Keep using original `generateHTML` 
+3. Just add image display to existing HTML
+4. Gradually add features one by one
+
+The key is to get SOMETHING working first, then add complexity.
+
+---
+
+## COMPLETE WORKING IMPLEMENTATION PLAN
+
+### Current Status Deep Dive
+After thorough analysis, here's what's actually happening:
+
+1. **New files exist** but have critical errors preventing compilation
+2. **Import paths are wrong** - using `@/config/parody-styles` instead of `@/lib/styles`
+3. **Type mismatches** - interfaces don't align properly
+4. **Missing exports** - no instances exported from new modules
+5. **Route expects methods** that don't exist in display manager
+
+### Step-by-Step Fix Order (MUST BE DONE IN THIS ORDER)
+
+#### Step 1: Fix All Import Paths (5 minutes)
+```bash
+# Run these commands to fix all imports at once:
+sed -i '' 's|@/config/parody-styles|@/lib/styles|g' lib/image-transformer.ts
+sed -i '' 's|@/config/parody-styles|@/lib/styles|g' lib/site-reconstructor.ts
+sed -i '' 's|@/config/parody-styles|@/lib/styles|g' app/api/generate-parody/route.ts
+```
+
+#### Step 2: Fix extract-complete.ts (10 minutes)
+```typescript
+// Fix 1: Remove 'extends ExtractedContent' - make standalone
+export interface CompleteExtraction {
+  // Copy all properties, don't extend
+}
+
+// Fix 2: Fix $ not defined error (line 285)
+const rootStyle = _$(':root').attr('style') || '';  // Use _$ parameter
+
+// Fix 3: Fix Cheerio types
+import type { Element } from 'cheerio';
+// Change all cheerio.Element to just Element
+```
+
+#### Step 3: Fix image-transformer.ts (5 minutes)
+```typescript
+// Fix 1: Add export at bottom
+export const imageTransformer = new ImageTransformer();
+
+// Fix 2: Fix type indexing
+const styleData = stylePrompts[style as keyof typeof stylePrompts];
+if (!styleData) return imageUrl; // fallback
+const prompt = styleData[context as keyof typeof styleData];
+
+// Fix 3: Fix DALL-E response
+if (response.data && response.data[0]) {
+  return response.data[0].url!;
+}
+```
+
+#### Step 4: Fix site-reconstructor.ts (5 minutes)
+```typescript
+// Fix 1: Add export at bottom
+export const siteReconstructor = new SiteReconstructor();
+
+// Fix 2: Fix theme indexing
+const themeStyle = themes[style as keyof typeof themes] || '';
+```
+
+#### Step 5: Fix display-manager.ts (5 minutes)
+```typescript
+// Add missing method that route expects
+async getStoredParody(id: string): Promise<string | null> {
+  // For now, return null - implement storage later
+  return null;
+}
+
+// Add export at bottom
+export const displayManager = new DisplayManager();
+```
+
+#### Step 6: Update Route for Minimal Working Version (10 minutes)
+```typescript
+// app/api/generate-parody/route.ts
+import { ParodyStyleKey } from '@/lib/styles';  // Fixed import
+
+export async function POST(req: NextRequest) {
+  try {
+    const { url, style } = await req.json();
+    
+    // 1. Basic capture (already works)
+    const { html, screenshot } = await captureWithFallbacks(url);
+    
+    // 2. Use ORIGINAL extract for now (it works)
+    const content = extractContent(html);
+    
+    // 3. Generate text parody (already works)
+    const parodyContent = await generateParody(content, style);
+    
+    // 4. Generate simple HTML (already works)
+    const parodyHtml = generateHTML(content, parodyContent);
+    
+    // 5. Return with base64 preview
+    const base64Html = Buffer.from(parodyHtml).toString('base64');
+    const previewUrl = `data:text/html;base64,${base64Html}`;
+    
+    return NextResponse.json({
+      success: true,
+      html: parodyHtml,
+      previewUrl,  // Can open directly in browser
+      originalUrl: url,
+      style,
+      summary: parodyContent.summary
+    });
+  } catch (error) {
+    // Proper error handling
+    console.error('Error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### Working Test Flow
+
+1. **Start server**: `bun run dev`
+2. **Test basic API**:
+```bash
+curl -X POST http://localhost:3000/api/generate-parody \
+  -H "Content-Type: application/json" \
+  -d '{"url": "mitchforest.com", "style": "simpsons"}' \
+  | jq -r '.previewUrl' | xargs open
+```
+
+This will:
+- Capture the site ✓
+- Extract content ✓
+- Transform text to Simpsons style ✓
+- Generate HTML ✓
+- Open preview in browser ✓
+
+### Phase 2: Add Image Transformation (After Basic Works)
+
+Once the above is working, gradually add:
+
+1. **Test image extraction**:
+```typescript
+const completeExtraction = await extractComplete(html);
+console.log(`Found ${completeExtraction.images.length} images`);
+// Don't transform yet, just log
+```
+
+2. **Add simple image display**:
+```typescript
+// In generateHTML, add images section:
+${content.images.map(img => 
+  `<img src="${img.src}" alt="${img.alt}" />`
+).join('')}
+```
+
+3. **Finally add transformation** (when ready):
+```typescript
+// Only transform first 3 images as test
+const imagesToTransform = completeExtraction.images.slice(0, 3);
+const transformed = await imageTransformer.transformMultipleImages(
+  imagesToTransform.map(img => ({
+    url: img.src,
+    context: img.context
+  })),
+  style
+);
+```
+
+### Critical Success Factors
+
+1. **Get text-only version working FIRST**
+2. **Use data URLs for immediate preview** (no storage needed)
+3. **Add features incrementally** (don't try everything at once)
+4. **Test each step** before moving to next
+5. **Keep console.log statements** to debug
+
+### If Still Broken - Emergency Simple Version
+
+```typescript
+// Absolute minimal working version
+export async function POST(req: NextRequest) {
+  const { url, style } = await req.json();
+  
+  // Just return a simple HTML page
+  const html = `
+    <html>
+      <body style="background: yellow; font-family: Comic Sans MS">
+        <h1>D'oh! Parody of ${url}</h1>
+        <p>Style: ${style}</p>
+        <p>This is a test parody page</p>
+      </body>
+    </html>
+  `;
+  
+  return NextResponse.json({
+    success: true,
+    html,
+    previewUrl: `data:text/html;base64,${Buffer.from(html).toString('base64')}`
+  });
+}
+```
+
+### Validation Checklist
+
+- [ ] Run `bun run typecheck` - should have 0 errors
+- [ ] API returns response without crashing
+- [ ] `previewUrl` opens in browser
+- [ ] Console shows capture → extract → transform flow
+- [ ] Simpsons text transformation visible
+
+The plan is to get a WORKING version with just text transformation first, then gradually add the complex image transformation features.

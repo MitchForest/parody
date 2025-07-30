@@ -1,12 +1,15 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as cheerio from 'cheerio';
 import { ExtractedContent } from './extract';
 
-// Complete extraction interface that captures EVERYTHING from a website
-export interface CompleteExtraction extends ExtractedContent {
-  // Raw HTML for complete reconstruction
-  fullHtml: string;
-  
-  // Visual Assets - All images, videos, media
+export interface CompleteExtraction {
+  // Basic content (copied from ExtractedContent)
+  title: string;
+  headings: { h1: string[], h2: string[], h3: string[] };
+  paragraphs: string[];
+  navigation: Array<{ text: string; href?: string }>;
+  buttons: string[];
+  // Visual Assets
   images: Array<{
     src: string;
     originalSrc: string;
@@ -14,547 +17,428 @@ export interface CompleteExtraction extends ExtractedContent {
     className?: string;
     id?: string;
     parentSelector: string;
-    dimensions: { width: number; height: number };
+    dimensions?: { width: number; height: number };
     isBackground: boolean;
     dataAttributes?: Record<string, string>;
-    context: 'hero' | 'content' | 'background' | 'icon' | 'logo';
+    context: 'hero' | 'content' | 'background' | 'icon';
   }>;
   
+  // Media
   videos: Array<{
     src: string;
     poster?: string;
     className?: string;
     parentSelector: string;
     autoplay?: boolean;
-    loop?: boolean;
   }>;
   
-  // Complete Document Structure
+  // Structure
   documentStructure: {
-    doctype: string;
-    htmlAttributes: Record<string, string>;
-    headContent: {
-      meta: Array<{ name?: string; content?: string; property?: string }>;
-      links: Array<{ rel: string; href: string; type?: string }>;
-      scripts: Array<{ src?: string; inline?: string; type?: string }>;
-      styles: Array<{ href?: string; inline?: string }>;
-    };
-    bodyAttributes: Record<string, string>;
     sections: Array<{
       selector: string;
       tagName: string;
       className: string;
-      id?: string;
-      children: any[];
+      children: unknown[];
       order: number;
-      level: number;
     }>;
   };
   
-  // Styling Information
-  styling: {
-    inlineStyles: Record<string, string>;
-    cssRules: string[];
-    colorScheme: {
-      primary?: string;
-      secondary?: string;
-      background?: string;
-      text?: string;
-      accent?: string;
-    };
-    fonts: string[];
-    isDarkMode?: boolean;
-    customProperties: Record<string, string>; // CSS variables
+  // Styling
+  inlineStyles: Record<string, string>;
+  cssRules: string[];
+  colorScheme: {
+    primary: string;
+    secondary: string;
+    background: string;
+    text: string;
   };
   
-  // Layout Information
-  layout: {
-    isResponsive: boolean;
-    breakpoints: string[];
-    gridSystems: Array<{
-      selector: string;
-      columns: number;
-      gap?: string;
-    }>;
-    flexboxes: Array<{
-      selector: string;
-      direction: string;
-      justify: string;
-      align: string;
-    }>;
-  };
-  
-  // Interactive Elements
+  // Interactive
   forms: Array<{
-    selector: string;
-    action?: string;
+    action: string;
     method: string;
     fields: Array<{
+      label: string;
       type: string;
-      name?: string;
-      placeholder?: string;
+      name: string;
       required?: boolean;
-      label?: string;
     }>;
   }>;
   
-  // Scripts and Functionality
   scripts: Array<{
     src?: string;
     inline?: string;
     type: string;
-    async?: boolean;
-    defer?: boolean;
   }>;
   
-  // SEO and Meta Information
-  seo: {
-    title: string;
-    description?: string;
-    keywords?: string;
-    ogTags: Record<string, string>;
-    canonicalUrl?: string;
-    robots?: string;
+  // Layout info
+  layout: {
+    hasGrid: boolean;
+    hasFlexbox: boolean;
+    hasColumns: boolean;
+    breakpoints: string[];
+  };
+  
+  // Full HTML for reconstruction
+  fullHtml: string;
+}
+
+export async function extractComplete(html: string): Promise<CompleteExtraction> {
+  const $ = cheerio.load(html);
+  
+  // Extract all images with context detection
+  const images = extractImages($);
+  
+  // Extract videos
+  const videos = extractVideos($);
+  
+  // Extract document structure
+  const documentStructure = extractDocumentStructure($);
+  
+  // Extract styling information
+  const { inlineStyles, cssRules, colorScheme } = extractStyling($);
+  
+  // Extract forms
+  const forms = extractForms($);
+  
+  // Extract scripts
+  const scripts = extractScripts($);
+  
+  // Analyze layout
+  const layout = analyzeLayout($);
+  
+  // Get basic content (from existing extract function)
+  const basicContent = extractBasicContent($);
+  
+  return {
+    ...basicContent,
+    images,
+    videos,
+    documentStructure,
+    inlineStyles,
+    cssRules,
+    colorScheme,
+    forms,
+    scripts,
+    layout,
+    fullHtml: $.html()
   };
 }
 
-export class CompleteExtractor {
+function extractImages($: cheerio.CheerioAPI): CompleteExtraction['images'] {
+  const images: CompleteExtraction['images'] = [];
   
-  extractComplete(html: string, url: string): CompleteExtraction {
-    const $ = cheerio.load(html);
+  // Regular img tags
+  $('img').each((i, elem) => {
+    const $elem = $(elem);
+    const src = $elem.attr('src');
     
-    // Start with basic extraction
-    const basicExtraction = this.extractBasicContent($);
-    
-    return {
-      ...basicExtraction,
-      fullHtml: html,
-      images: this.extractAllImages($, url),
-      videos: this.extractVideos($),
-      documentStructure: this.extractDocumentStructure($),
-      styling: this.extractStyling($),
-      layout: this.extractLayoutInfo($),
-      forms: this.extractForms($),
-      scripts: this.extractScripts($),
-      seo: this.extractSEOInfo($)
-    };
-  }
-  
-  private extractBasicContent($: cheerio.CheerioAPI): ExtractedContent {
-    return {
-      title: $('title').text(),
-      headings: {
-        h1: $('h1').map((_, el) => $(el).text()).get(),
-        h2: $('h2').map((_, el) => $(el).text()).get(),
-        h3: $('h3').map((_, el) => $(el).text()).get(),
-      },
-      paragraphs: $('p').map((_, el) => $(el).text()).get(),
-      navigation: $('nav a, header a').map((_, el) => ({
-        text: $(el).text(),
-        href: $(el).attr('href')
-      })).get(),
-      buttons: $('button, .button, .btn, input[type="submit"]').map((_, el) => $(el).text() || $(el).attr('value') || '').get(),
-      images: $('img').map((_, el) => ({
-        alt: $(el).attr('alt'),
-        src: $(el).attr('src')
-      })).get()
-    };
-  }
-  
-  private extractAllImages($: cheerio.CheerioAPI, baseUrl: string): CompleteExtraction['images'] {
-    const images: CompleteExtraction['images'] = [];
-    
-    // Extract <img> elements
-    $('img').each((i, el) => {
-      const $el = $(el);
-      const src = $el.attr('src');
-      if (!src) return;
-      
-      const absoluteSrc = this.resolveUrl(src, baseUrl);
-      const parentSelector = this.getParentSelector($el);
+    if (src) {
+      const context = detectImageContext($elem, $);
       
       images.push({
-        src: absoluteSrc,
+        src: makeAbsoluteUrl(src),
         originalSrc: src,
-        alt: $el.attr('alt'),
-        className: $el.attr('class'),
-        id: $el.attr('id'),
-        parentSelector,
+        alt: $elem.attr('alt'),
+        className: $elem.attr('class'),
+        id: $elem.attr('id'),
+        parentSelector: getParentSelector($elem),
         dimensions: {
-          width: parseInt($el.attr('width') || '0') || 0,
-          height: parseInt($el.attr('height') || '0') || 0
+          width: parseInt($elem.attr('width') || '0'),
+          height: parseInt($elem.attr('height') || '0')
         },
         isBackground: false,
-        context: this.determineImageContext($el, parentSelector),
-        dataAttributes: this.getDataAttributes($el)
+        dataAttributes: getDataAttributes($elem),
+        context
       });
-    });
-    
-    // Extract background images from CSS
-    $('*').each((i, el) => {
-      const $el = $(el);
-      const style = $el.attr('style');
-      if (style && style.includes('background-image')) {
-        const matches = style.match(/background-image:\s*url\(['"]?([^'")]+)['"]?\)/);
-        if (matches && matches[1]) {
-          const src = matches[1];
-          const absoluteSrc = this.resolveUrl(src, baseUrl);
-          
-          images.push({
-            src: absoluteSrc,
-            originalSrc: src,
-            parentSelector: this.getElementSelector($el),
-            dimensions: { width: 0, height: 0 },
-            isBackground: true,
-            context: 'background',
-            className: $el.attr('class'),
-            id: $el.attr('id')
-          });
-        }
-      }
-    });
-    
-    return images;
-  }
+    }
+  });
   
-  private extractVideos($: cheerio.CheerioAPI): CompleteExtraction['videos'] {
-    const videos: CompleteExtraction['videos'] = [];
+  // Background images in style attributes
+  $('[style*="background-image"]').each((i, elem) => {
+    const $elem = $(elem);
+    const style = $elem.attr('style') || '';
+    const match = style.match(/background-image:\s*url\(['"]?([^'")]+)['"]?\)/);
     
-    $('video').each((i, el) => {
-      const $el = $(el);
-      const src = $el.attr('src') || $el.find('source').first().attr('src');
-      if (src) {
-        videos.push({
-          src,
-          poster: $el.attr('poster'),
-          className: $el.attr('class'),
-          parentSelector: this.getParentSelector($el),
-          autoplay: $el.attr('autoplay') !== undefined,
-          loop: $el.attr('loop') !== undefined
-        });
-      }
-    });
-    
-    // Also check for embedded videos (YouTube, Vimeo, etc.)
-    $('iframe').each((i, el) => {
-      const $el = $(el);
-      const src = $el.attr('src');
-      if (src && (src.includes('youtube.com') || src.includes('vimeo.com'))) {
-        videos.push({
-          src,
-          className: $el.attr('class'),
-          parentSelector: this.getParentSelector($el)
-        });
-      }
-    });
-    
-    return videos;
-  }
-  
-  private extractDocumentStructure($: cheerio.CheerioAPI): CompleteExtraction['documentStructure'] {
-    return {
-      doctype: '<!DOCTYPE html>', // Default, could be enhanced
-      htmlAttributes: this.getElementAttributes($('html')),
-      headContent: {
-        meta: $('meta').map((_, el) => {
-          const $el = $(el);
-          return {
-            name: $el.attr('name'),
-            content: $el.attr('content'),
-            property: $el.attr('property')
-          };
-        }).get(),
-        links: $('link').map((_, el) => {
-          const $el = $(el);
-          return {
-            rel: $el.attr('rel') || '',
-            href: $el.attr('href') || '',
-            type: $el.attr('type')
-          };
-        }).get(),
-        scripts: this.extractScripts($),
-        styles: $('style, link[rel="stylesheet"]').map((_, el) => {
-          const $el = $(el);
-          return {
-            href: $el.attr('href'),
-            inline: el.tagName === 'style' ? $el.html() : undefined
-          };
-        }).get()
-      },
-      bodyAttributes: this.getElementAttributes($('body')),
-      sections: this.extractSections($)
-    };
-  }
-  
-  private extractSections($: cheerio.CheerioAPI): CompleteExtraction['documentStructure']['sections'] {
-    const sections: CompleteExtraction['documentStructure']['sections'] = [];
-    
-    // Extract major structural elements
-    const structuralSelectors = [
-      'header', 'nav', 'main', 'section', 'article', 'aside', 'footer',
-      '.hero', '.banner', '.content', '.sidebar', '.container'
-    ];
-    
-    structuralSelectors.forEach(selector => {
-      $(selector).each((i, el) => {
-        const $el = $(el);
-        sections.push({
-          selector,
-          tagName: el.tagName,
-          className: $el.attr('class') || '',
-          id: $el.attr('id'),
-          children: [], // Could be enhanced to include child structure
-          order: sections.length,
-          level: this.getElementLevel($el)
-        });
+    if (match && match[1]) {
+      images.push({
+        src: makeAbsoluteUrl(match[1]),
+        originalSrc: match[1],
+        className: $elem.attr('class'),
+        id: $elem.attr('id'),
+        parentSelector: getParentSelector($elem),
+        isBackground: true,
+        context: 'background'
       });
-    });
-    
-    return sections;
-  }
-  
-  private extractStyling($: cheerio.CheerioAPI): CompleteExtraction['styling'] {
-    const styling: CompleteExtraction['styling'] = {
-      inlineStyles: {},
-      cssRules: [],
-      colorScheme: {},
-      fonts: [],
-      customProperties: {}
-    };
-    
-    // Extract inline styles
-    $('[style]').each((i, el) => {
-      const $el = $(el);
-      const selector = this.getElementSelector($el);
-      const style = $el.attr('style');
-      if (style) {
-        styling.inlineStyles[selector] = style;
-      }
-    });
-    
-    // Extract CSS rules from <style> tags
-    $('style').each((i, el) => {
-      const css = $(el).html();
-      if (css) {
-        styling.cssRules.push(css);
-      }
-    });
-    
-    // Extract color scheme (basic implementation)
-    const bodyStyle = $('body').attr('style') || '';
-    if (bodyStyle.includes('background')) {
-      const bgMatch = bodyStyle.match(/background(?:-color)?:\s*([^;]+)/);
-      if (bgMatch) {
-        styling.colorScheme.background = bgMatch[1].trim();
-      }
     }
-    
-    // Extract fonts
-    const fontMatches = styling.cssRules.join(' ').match(/font-family:\s*([^;}]+)/g);
-    if (fontMatches) {
-      styling.fonts = [...new Set(fontMatches.map(match => 
-        match.replace('font-family:', '').trim()
-      ))];
-    }
-    
-    return styling;
-  }
+  });
   
-  private extractLayoutInfo($: cheerio.CheerioAPI): CompleteExtraction['layout'] {
-    return {
-      isResponsive: $('meta[name="viewport"]').length > 0,
-      breakpoints: [], // Could be enhanced by parsing CSS
-      gridSystems: this.extractGridSystems($),
-      flexboxes: this.extractFlexboxes($)
-    };
-  }
-  
-  private extractGridSystems($: cheerio.CheerioAPI): CompleteExtraction['layout']['gridSystems'] {
-    const grids: CompleteExtraction['layout']['gridSystems'] = [];
-    
-    // Look for common grid classes
-    $('.grid, .row, .container-fluid, .d-grid').each((i, el) => {
-      const $el = $(el);
-      grids.push({
-        selector: this.getElementSelector($el),
-        columns: $el.children().length || 12, // Default or count children
-        gap: '1rem' // Default
-      });
-    });
-    
-    return grids;
-  }
-  
-  private extractFlexboxes($: cheerio.CheerioAPI): CompleteExtraction['layout']['flexboxes'] {
-    const flexboxes: CompleteExtraction['layout']['flexboxes'] = [];
-    
-    $('.flex, .d-flex, .flexbox').each((i, el) => {
-      const $el = $(el);
-      flexboxes.push({
-        selector: this.getElementSelector($el),
-        direction: 'row', // Default
-        justify: 'flex-start', // Default
-        align: 'stretch' // Default
-      });
-    });
-    
-    return flexboxes;
-  }
-  
-  private extractForms($: cheerio.CheerioAPI): CompleteExtraction['forms'] {
-    const forms: CompleteExtraction['forms'] = [];
-    
-    $('form').each((i, el) => {
-      const $form = $(el);
-      const fields: CompleteExtraction['forms'][0]['fields'] = [];
-      
-      $form.find('input, textarea, select').each((j, field) => {
-        const $field = $(field);
-        fields.push({
-          type: $field.attr('type') || field.tagName.toLowerCase(),
-          name: $field.attr('name'),
-          placeholder: $field.attr('placeholder'),
-          required: $field.attr('required') !== undefined,
-          label: $field.closest('.form-group, .field').find('label').text() || $field.attr('aria-label')
-        });
-      });
-      
-      forms.push({
-        selector: this.getElementSelector($form),
-        action: $form.attr('action'),
-        method: $form.attr('method') || 'GET',
-        fields
-      });
-    });
-    
-    return forms;
-  }
-  
-  private extractScripts($: cheerio.CheerioAPI): CompleteExtraction['scripts'] {
-    const scripts: CompleteExtraction['scripts'] = [];
-    
-    $('script').each((i, el) => {
-      const $el = $(el);
-      scripts.push({
-        src: $el.attr('src'),
-        inline: $el.attr('src') ? undefined : $el.html(),
-        type: $el.attr('type') || 'text/javascript',
-        async: $el.attr('async') !== undefined,
-        defer: $el.attr('defer') !== undefined
-      });
-    });
-    
-    return scripts;
-  }
-  
-  private extractSEOInfo($: cheerio.CheerioAPI): CompleteExtraction['seo'] {
-    const ogTags: Record<string, string> = {};
-    
-    $('meta[property^="og:"]').each((i, el) => {
-      const $el = $(el);
-      const property = $el.attr('property');
-      const content = $el.attr('content');
-      if (property && content) {
-        ogTags[property] = content;
-      }
-    });
-    
-    return {
-      title: $('title').text(),
-      description: $('meta[name="description"]').attr('content'),
-      keywords: $('meta[name="keywords"]').attr('content'),
-      ogTags,
-      canonicalUrl: $('link[rel="canonical"]').attr('href'),
-      robots: $('meta[name="robots"]').attr('content')
-    };
-  }
-  
-  // Helper methods
-  private resolveUrl(url: string, baseUrl: string): string {
-    if (url.startsWith('http')) return url;
-    if (url.startsWith('//')) return 'https:' + url;
-    if (url.startsWith('/')) return new URL(baseUrl).origin + url;
-    return new URL(url, baseUrl).href;
-  }
-  
-  private getElementSelector($el: cheerio.Cheerio<cheerio.Element>): string {
-    const id = $el.attr('id');
-    if (id) return `#${id}`;
-    
-    const className = $el.attr('class');
-    if (className) return `.${className.split(' ')[0]}`;
-    
-    return $el.prop('tagName')?.toLowerCase() || 'element';
-  }
-  
-  private getParentSelector($el: cheerio.Cheerio<cheerio.Element>): string {
-    const parent = $el.parent();
-    return this.getElementSelector(parent);
-  }
-  
-  private getElementAttributes($el: cheerio.Cheerio<cheerio.Element>): Record<string, string> {
-    const attrs: Record<string, string> = {};
-    const element = $el.get(0);
-    if (element && element.attribs) {
-      Object.assign(attrs, element.attribs);
-    }
-    return attrs;
-  }
-  
-  private getDataAttributes($el: cheerio.Cheerio<cheerio.Element>): Record<string, string> {
-    const dataAttrs: Record<string, string> = {};
-    const attrs = this.getElementAttributes($el);
-    
-    Object.keys(attrs).forEach(key => {
-      if (key.startsWith('data-')) {
-        dataAttrs[key] = attrs[key];
-      }
-    });
-    
-    return dataAttrs;
-  }
-  
-  private determineImageContext($el: cheerio.Cheerio<cheerio.Element>, parentSelector: string): CompleteExtraction['images'][0]['context'] {
-    const src = $el.attr('src') || '';
-    const alt = $el.attr('alt') || '';
-    const className = $el.attr('class') || '';
-    
-    // Check for hero/banner context
-    if (parentSelector.includes('hero') || parentSelector.includes('banner') || 
-        className.includes('hero') || className.includes('banner')) {
-      return 'hero';
-    }
-    
-    // Check for logo context
-    if (src.includes('logo') || alt.includes('logo') || className.includes('logo')) {
-      return 'logo';
-    }
-    
-    // Check for icon context
-    if (src.includes('icon') || className.includes('icon') || 
-        parseInt($el.attr('width') || '0') < 50) {
-      return 'icon';
-    }
-    
-    // Default to content
-    return 'content';
-  }
-  
-  private getElementLevel($el: cheerio.Cheerio<cheerio.Element>): number {
-    let level = 0;
-    let current = $el;
-    
-    while (current.parent().length > 0) {
-      level++;
-      current = current.parent();
-    }
-    
-    return level;
-  }
+  return images;
 }
 
-// Export the extractor function
-export function extractComplete(html: string, url: string = ''): CompleteExtraction {
-  const extractor = new CompleteExtractor();
-  return extractor.extractComplete(html, url);
+function detectImageContext($elem: any, _$: cheerio.CheerioAPI): 'hero' | 'content' | 'background' | 'icon' {
+  const src = $elem.attr('src') || '';
+  const alt = $elem.attr('alt') || '';
+  const className = $elem.attr('class') || '';
+  
+  // Check for hero indicators
+  if (
+    className.includes('hero') ||
+    className.includes('banner') ||
+    $elem.closest('.hero, .banner, header').length > 0 ||
+    alt.toLowerCase().includes('hero')
+  ) {
+    return 'hero';
+  }
+  
+  // Check for icons
+  if (
+    className.includes('icon') ||
+    className.includes('logo') ||
+    src.includes('icon') ||
+    src.includes('logo') ||
+    alt.toLowerCase().includes('icon') ||
+    alt.toLowerCase().includes('logo')
+  ) {
+    return 'icon';
+  }
+  
+  // Check dimensions for icons (small images)
+  const width = parseInt($elem.attr('width') || '0');
+  const height = parseInt($elem.attr('height') || '0');
+  if ((width > 0 && width < 100) || (height > 0 && height < 100)) {
+    return 'icon';
+  }
+  
+  return 'content';
+}
+
+function extractVideos($: cheerio.CheerioAPI): CompleteExtraction['videos'] {
+  const videos: CompleteExtraction['videos'] = [];
+  
+  $('video').each((i, elem) => {
+    const $elem = $(elem);
+    const src = $elem.attr('src') || $elem.find('source').first().attr('src');
+    
+    if (src) {
+      videos.push({
+        src: makeAbsoluteUrl(src),
+        poster: $elem.attr('poster') ? makeAbsoluteUrl($elem.attr('poster')!) : undefined,
+        className: $elem.attr('class'),
+        parentSelector: getParentSelector($elem),
+        autoplay: $elem.attr('autoplay') !== undefined
+      });
+    }
+  });
+  
+  return videos;
+}
+
+function extractDocumentStructure($: cheerio.CheerioAPI): CompleteExtraction['documentStructure'] {
+  const sections: CompleteExtraction['documentStructure']['sections'] = [];
+  
+  // Extract major structural elements
+  $('header, nav, main, section, aside, footer, div[class*="section"], div[class*="container"]').each((i, elem) => {
+    const $elem = $(elem);
+    
+    sections.push({
+      selector: getElementSelector($elem),
+      tagName: elem.tagName.toLowerCase(),
+      className: $elem.attr('class') || '',
+      children: [], // TODO: Extract child structure if needed
+      order: i
+    });
+  });
+  
+  return { sections };
+}
+
+function extractStyling($: cheerio.CheerioAPI): {
+  inlineStyles: Record<string, string>;
+  cssRules: string[];
+  colorScheme: CompleteExtraction['colorScheme'];
+} {
+  const inlineStyles: Record<string, string> = {};
+  const cssRules: string[] = [];
+  
+  // Extract inline styles
+  $('[style]').each((i, elem) => {
+    const $elem = $(elem);
+    const selector = getElementSelector($elem);
+    inlineStyles[selector] = $elem.attr('style') || '';
+  });
+  
+  // Extract CSS from style tags
+  $('style').each((i, elem) => {
+    cssRules.push($(elem).text());
+  });
+  
+  // Extract color scheme (simplified)
+  const colorScheme = extractColorScheme($);
+  
+  return { inlineStyles, cssRules, colorScheme };
+}
+
+function extractColorScheme($: cheerio.CheerioAPI): CompleteExtraction['colorScheme'] {
+  // Simple color extraction - could be enhanced with more sophisticated analysis
+  const colors = {
+    primary: '#000000',
+    secondary: '#666666', 
+    background: '#ffffff',
+    text: '#000000'
+  };
+  
+  // Extract from common CSS variables or computed styles
+  const rootStyle = $(':root').attr('style') || '';
+  
+  // Look for common color patterns
+  const colorMatch = rootStyle.match(/--primary[^:]*:\s*([^;]+)/);
+  if (colorMatch) {
+    colors.primary = colorMatch[1].trim();
+  }
+  
+  return colors;
+}
+
+function extractForms($: cheerio.CheerioAPI): CompleteExtraction['forms'] {
+  const forms: CompleteExtraction['forms'] = [];
+  
+  $('form').each((i, elem) => {
+    const $form = $(elem);
+    const fields: CompleteExtraction['forms'][0]['fields'] = [];
+    
+    $form.find('input, textarea, select').each((j, field) => {
+      const $field = $(field);
+      const label = $field.prev('label').text() || 
+                   $field.attr('placeholder') || 
+                   $field.attr('name') || 
+                   'Unnamed field';
+      
+      fields.push({
+        label,
+        type: $field.attr('type') || field.tagName.toLowerCase(),
+        name: $field.attr('name') || '',
+        required: $field.attr('required') !== undefined
+      });
+    });
+    
+    forms.push({
+      action: $form.attr('action') || '',
+      method: $form.attr('method') || 'GET',
+      fields
+    });
+  });
+  
+  return forms;
+}
+
+function extractScripts($: cheerio.CheerioAPI): CompleteExtraction['scripts'] {
+  const scripts: CompleteExtraction['scripts'] = [];
+  
+  $('script').each((i, elem) => {
+    const $elem = $(elem);
+    const src = $elem.attr('src');
+    
+    scripts.push({
+      src: src ? makeAbsoluteUrl(src) : undefined,
+      inline: src ? undefined : $elem.text(),
+      type: $elem.attr('type') || 'text/javascript'
+    });
+  });
+  
+  return scripts;
+}
+
+function analyzeLayout($: cheerio.CheerioAPI): CompleteExtraction['layout'] {
+  let hasGrid = false;
+  let hasFlexbox = false;
+  let hasColumns = false;
+  const breakpoints: string[] = [];
+  
+  // Check for grid/flexbox in CSS
+  $('style').each((i, elem) => {
+    const css = $(elem).text();
+    if (css.includes('display: grid') || css.includes('display:grid')) {
+      hasGrid = true;
+    }
+    if (css.includes('display: flex') || css.includes('display:flex')) {
+      hasFlexbox = true;
+    }
+    if (css.includes('columns:') || css.includes('column-count:')) {
+      hasColumns = true;
+    }
+    
+    // Extract media queries
+    const mediaQueries = css.match(/@media[^{]+/g) || [];
+    breakpoints.push(...mediaQueries);
+  });
+  
+  return { hasGrid, hasFlexbox, hasColumns, breakpoints };
+}
+
+function extractBasicContent($: cheerio.CheerioAPI): ExtractedContent {
+  return {
+    title: $('title').text() || $('h1').first().text() || 'Untitled',
+    headings: {
+      h1: $('h1').map((i, el) => $(el).text()).get(),
+      h2: $('h2').map((i, el) => $(el).text()).get(),
+      h3: $('h3').map((i, el) => $(el).text()).get()
+    },
+    paragraphs: $('p').map((i, el) => $(el).text()).get().filter(p => p.trim().length > 0),
+    navigation: $('nav a, .nav a, .navbar a').map((i, el) => ({
+      text: $(el).text().trim(),
+      href: $(el).attr('href')
+    })).get(),
+    buttons: $('button, .btn, .button, input[type="submit"]').map((i, el) => $(el).text() || $(el).attr('value') || '').get(),
+    images: $('img').map((i, el) => ({
+      src: $(el).attr('src'),
+      alt: $(el).attr('alt')
+    })).get()
+  };
+}
+
+// Helper functions
+function makeAbsoluteUrl(url: string): string {
+  if (url.startsWith('http') || url.startsWith('//')) {
+    return url;
+  }
+  // For now, return as-is. In production, would need base URL
+  return url;
+}
+
+function getParentSelector($elem: any): string {
+  const parent = $elem.parent();
+  if (parent.length === 0) return 'body';
+  
+  return getElementSelector(parent);
+}
+
+function getElementSelector($elem: any): string {
+  const tagName = $elem.prop('tagName')?.toLowerCase() || 'div';
+  const id = $elem.attr('id');
+  const className = $elem.attr('class');
+  
+  if (id) {
+    return `${tagName}#${id}`;
+  }
+  
+  if (className) {
+    const cleanClasses = className.split(' ').filter((c: string) => c.length > 0).slice(0, 2).join('.');
+    return `${tagName}.${cleanClasses}`;
+  }
+  
+  return tagName;
+}
+
+function getDataAttributes($elem: any): Record<string, string> {
+  const dataAttrs: Record<string, string> = {};
+  const attributes = $elem.get(0)?.attribs || {};
+  
+  Object.keys(attributes).forEach(key => {
+    if (key.startsWith('data-')) {
+      dataAttrs[key] = attributes[key];
+    }
+  });
+  
+  return dataAttrs;
 }

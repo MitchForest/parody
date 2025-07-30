@@ -10,12 +10,22 @@ import { Loader2, Globe, Sparkles } from 'lucide-react';
 
 interface ParodyResult {
   success: boolean;
-  html: string;
+  parodyId?: string;
+  parodyUrl?: string;
+  blobUrl?: string;
+  comparisonUrl?: string;
+  downloadUrl?: string;
   originalUrl: string;
   style: string;
   summary: string;
-  imageUrl?: string;
   captureStrategy?: string;
+  stats?: {
+    imagesTransformed: number;
+    textElementsTransformed: number;
+    stylesApplied: number;
+    totalProcessingTime: number;
+    fileSize: number;
+  };
   error?: string;
   errorType?: string;
   timestamp?: string;
@@ -42,10 +52,10 @@ export default function Home() {
       
       const data = await response.json();
       setResult(data);
-    } catch (err) {
+    } catch (error) {
+      console.error('Generation failed:', error);
       setResult({
         success: false,
-        html: '',
         originalUrl: url,
         style,
         summary: '',
@@ -56,16 +66,19 @@ export default function Home() {
     }
   };
 
-  const downloadHTML = () => {
-    if (!result?.html) return;
-    
-    const blob = new Blob([result.html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `parody-${result.style}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const openParody = () => {
+    if (!result?.parodyUrl) return;
+    window.open(result.parodyUrl, '_blank');
+  };
+  
+  const openComparison = () => {
+    if (!result?.comparisonUrl) return;
+    window.open(result.comparisonUrl, '_blank');
+  };
+  
+  const downloadParody = () => {
+    if (!result?.downloadUrl) return;
+    window.open(result.downloadUrl, '_blank');
   };
 
   return (
@@ -198,9 +211,18 @@ export default function Home() {
                       ? (
                           <div className="space-y-2">
                             <p>{result.summary}</p>
-                            <div className="flex gap-4 text-xs text-gray-500">
-                              <span>Style: {PARODY_STYLES[result.style as keyof typeof PARODY_STYLES]?.name}</span>
-                              {result.captureStrategy && <span>Method: {result.captureStrategy}</span>}
+                            <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+                              <div>
+                                <span>Style: {PARODY_STYLES[result.style as keyof typeof PARODY_STYLES]?.name}</span>
+                                {result.captureStrategy && <div>Method: {result.captureStrategy}</div>}
+                              </div>
+                              {result.stats && (
+                                <div>
+                                  <div>Images: {result.stats.imagesTransformed}</div>
+                                  <div>Time: {(result.stats.totalProcessingTime / 1000).toFixed(1)}s</div>
+                                  <div>Size: {(result.stats.fileSize / 1024).toFixed(1)} KB</div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )
@@ -214,30 +236,32 @@ export default function Home() {
                   </CardDescription>
                 </div>
                 {result.success && (
-                  <div className="flex gap-2">
-                    <Button onClick={downloadHTML} variant="outline">
-                      Download HTML
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={openParody} className="bg-green-600 hover:bg-green-700">
+                      🚀 Open Parody
                     </Button>
-                    {result.imageUrl && (
-                      <Button asChild variant="outline">
-                        <a href={result.imageUrl} target="_blank" rel="noopener noreferrer">
-                          View AI Image
-                        </a>
-                      </Button>
-                    )}
+                    <Button onClick={openComparison} variant="outline">
+                      🔄 Compare
+                    </Button>
+                    <Button onClick={downloadParody} variant="outline">
+                      💾 Download
+                    </Button>
                   </div>
                 )}
               </div>
             </CardHeader>
-            {result.success && (
+            {result.success && result.blobUrl && (
               <CardContent>
                 <div className="border rounded-lg overflow-hidden">
                   <iframe
-                    srcDoc={result.html}
-                    className="w-full h-[600px]"
+                    src={result.blobUrl}
+                    className="w-full h-[400px]"
                     title="Parody Preview"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Preview • Click &quot;🚀 Open Parody&quot; for full experience
+                </p>
               </CardContent>
             )}
           </Card>

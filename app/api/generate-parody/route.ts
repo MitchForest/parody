@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { captureWithFallbacks } from '@/lib/capture-strategies';
 import { extractContent } from '@/lib/extract';
+import { extractComplete } from '@/lib/extract-complete';
 import { generateParody } from '@/lib/parody';
-import { generateHTML } from '@/lib/generate';
-import { generateImage, generateParodyImagePrompt } from '@/lib/image-generation';
+import { imageTransformer } from '@/lib/image-transformer';
+import { siteReconstructor } from '@/lib/site-reconstructor';
+import { displayManager } from '@/lib/display-manager';
 import { ParodyStyleKey } from '@/lib/styles';
 
 export async function POST(req: NextRequest) {
@@ -29,37 +31,84 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const startTime = Date.now();
+    
     // 1. Capture website with fallback strategies
-    console.log('🚀 Starting capture for:', url);
-    const { screenshot, html, strategy } = await captureWithFallbacks(url);
+    console.log('🚀 Starting COMPLETE capture for:', url);
+    const { html, strategy } = await captureWithFallbacks(url);
     console.log(`✅ Captured with strategy: ${strategy}`);
     
-    // 2. Extract content
-    console.log('Extracting content...');
-    const content = extractContent(html);
+    // 2. COMPLETE extraction - everything from the website
+    console.log('🔍 Performing complete extraction...');
+    const completeExtraction = await extractComplete(html);
+    console.log(`   - Found ${completeExtraction.images.length} images`);
+    console.log(`   - Found ${completeExtraction.videos.length} videos`);
+    console.log(`   - Found ${completeExtraction.documentStructure.sections.length} sections`);
     
-    // 3. Generate parody with GPT-4o
-    console.log('Generating parody with style:', style);
-    const parodyContent = await generateParody(content, style);
+    // 3. Generate parody text content with GPT-4o
+    console.log('🤖 Generating parody text content...');
+    const basicContent = extractContent(html); // For text transformation
+    const parodyContent = await generateParody(basicContent, style);
     
-    // 4. Create HTML output
-    console.log('Generating HTML output...');
-    const parodyHTML = generateHTML(content, parodyContent);
+    // 4. Transform images with AI (limit to first 5 for demo)
+    console.log('🎨 Transforming images with AI...');
+    const imagesToTransform = completeExtraction.images.slice(0, 5).map(img => ({
+      url: img.src,
+      context: img.context
+    }));
     
-    // 5. Optional: Generate shareable image
-    console.log('Generating parody image (optional)...');
-    const imagePrompt = generateParodyImagePrompt(parodyContent);
-    const shareImage = await generateImage(screenshot, imagePrompt);
+    const transformedImages = await imageTransformer.transformMultipleImages(
+      imagesToTransform,
+      style
+    );
+    
+    // 5. Reconstruct complete website
+    console.log('🔨 Reconstructing complete website...');
+    const transformedContent = {
+      text: {
+        title: parodyContent.title,
+        headings: parodyContent.headings,
+        paragraphs: parodyContent.paragraphs,
+        navigation: parodyContent.navigation,
+        buttons: parodyContent.buttons
+      },
+      images: transformedImages
+    };
+    
+    const reconstructedSite = await siteReconstructor.reconstructSite(
+      completeExtraction,
+      transformedContent,
+      style
+    );
+    
+    // 6. Prepare display options
+    console.log('📄 Preparing display options...');
+    const displayResult = await displayManager.displayParody(
+      reconstructedSite,
+      url,
+      style,
+      {
+        imagesTransformed: transformedImages.length,
+        processingTime: Date.now() - startTime
+      }
+    );
+    
+    const totalTime = Date.now() - startTime;
     
     return NextResponse.json({
       success: true,
-      html: parodyHTML,
-      imageUrl: shareImage,
+      ...displayResult,
       originalUrl: url,
       style: style,
       summary: parodyContent.summary,
       captureStrategy: strategy,
-      screenshotTaken: screenshot.length > 0
+      stats: {
+        totalProcessingTime: totalTime,
+        imagesTransformed: transformedImages.length,
+        sectionsFound: completeExtraction.documentStructure.sections.length,
+        videosFound: completeExtraction.videos.length,
+        formsFound: completeExtraction.forms.length
+      }
     });
     
   } catch (error) {
