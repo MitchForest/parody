@@ -4,7 +4,16 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Flame, Volume2, VolumeX, ExternalLink } from 'lucide-react';
+import { Loader2, Flame, Volume2, VolumeX, ExternalLink, Shuffle } from 'lucide-react';
+
+// Predefined portfolio list
+const PORTFOLIO_LINKS = [
+  'https://andrew.shindyapin.com/',
+  'https://www.trevoralpert.com/projects',
+  'https://cjonescode.github.io/',
+  'https://www.sadaqat.ai/',
+  'https://patrickskinner.tech/'
+];
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -17,6 +26,10 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [showPreview, setShowPreview] = useState(false);
+  
+  // State for random portfolio selection
+  const [usedPortfolios, setUsedPortfolios] = useState<Set<string>>(new Set());
+  const [availablePortfolios, setAvailablePortfolios] = useState<string[]>([...PORTFOLIO_LINKS]);
 
   const handleRoast = async () => {
     if (!url) return;
@@ -54,6 +67,33 @@ export default function Home() {
     }
   };
 
+  const selectRandomPortfolio = () => {
+    if (availablePortfolios.length === 0) {
+      // All portfolios have been used, reset the list
+      setUsedPortfolios(new Set());
+      setAvailablePortfolios([...PORTFOLIO_LINKS]);
+      alert('All portfolios have been roasted! Resetting the list...');
+      return;
+    }
+
+    // Select random portfolio from available ones
+    const randomIndex = Math.floor(Math.random() * availablePortfolios.length);
+    const selectedPortfolio = availablePortfolios[randomIndex];
+    
+    // Update states
+    setUrl(selectedPortfolio);
+    setUsedPortfolios(prev => new Set([...prev, selectedPortfolio]));
+    setAvailablePortfolios(prev => prev.filter(portfolio => portfolio !== selectedPortfolio));
+  };
+
+  const resetPortfolioList = () => {
+    setUsedPortfolios(new Set());
+    setAvailablePortfolios([...PORTFOLIO_LINKS]);
+    setUrl('');
+    setRoast(null);
+    setShowPreview(false);
+  };
+
   const togglePlayPause = () => {
     if (audioRef.current) {
       if (isPlaying) {
@@ -88,6 +128,36 @@ export default function Home() {
                 onKeyPress={(e) => e.key === 'Enter' && !loading && handleRoast()}
                 className="text-lg bg-gray-800 border-gray-700 text-white placeholder-gray-500 h-14"
               />
+            </div>
+            
+            {/* Random Portfolio Selection */}
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <Button 
+                  onClick={selectRandomPortfolio}
+                  disabled={loading}
+                  variant="outline"
+                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                >
+                  <Shuffle className="mr-2 h-4 w-4" />
+                  Random Portfolio ({availablePortfolios.length} left)
+                </Button>
+                <Button 
+                  onClick={resetPortfolioList}
+                  disabled={loading}
+                  variant="outline"
+                  className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                  title="Reset portfolio list"
+                >
+                  Reset
+                </Button>
+              </div>
+              
+              {usedPortfolios.size > 0 && (
+                <div className="text-xs text-gray-500">
+                  Roasted: {usedPortfolios.size} / {PORTFOLIO_LINKS.length} portfolios
+                </div>
+              )}
             </div>
             
             <Button 
