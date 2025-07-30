@@ -6,7 +6,7 @@ export async function generateAudioRoast(text: string): Promise<Buffer> {
   }
   
   // Using the provided voice ID
-  const voiceId = 'lCfIptVKzlPoj4vLmTLz';
+  const voiceId = 'UgBBYS2sOqTuMpoF3BR0';
   
   try {
     const response = await fetch(
