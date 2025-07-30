@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Flame, Volume2, VolumeX, ExternalLink, Shuffle } from 'lucide-react';
+import { Loader2, Flame, Volume2, VolumeX, ExternalLink, Shuffle, X } from 'lucide-react';
 
 // Predefined portfolio list
 const PORTFOLIO_LINKS = [
@@ -14,7 +14,7 @@ const PORTFOLIO_LINKS = [
   'https://www.sadaqat.ai/',
   'https://patrickskinner.tech/',
   'https://www.austintheatre.org/moontower-comedy/performers/avery-moore/',
-  'https://www.austenallred.com/'
+  'https://www.austenallred.com/',
 ];
 
 export default function Home() {
@@ -36,14 +36,156 @@ export default function Home() {
   // State for slot machine animation
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinningUrl, setSpinningUrl] = useState('');
+  
+  // State for intro message
+  const [showIntro, setShowIntro] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const introAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // State for cooking audio
+  const [isCooking, setIsCooking] = useState(false);
+  const cookingAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Function to generate and play intro audio using ElevenLabs
+  const playIntroAudio = useCallback(async () => {
+    console.log('🎤 Generating intro audio...');
+    setIsSpeaking(true);
+    
+    try {
+      const response = await fetch('/api/intro-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate intro audio');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ Intro audio ready, playing...');
+        
+        // Create and play audio element
+        const audio = new Audio(data.audioUrl);
+        audio.volume = 0.8;
+        introAudioRef.current = audio;
+        
+        audio.onended = () => {
+          console.log('🎤 Intro audio finished');
+          setIsSpeaking(false);
+          introAudioRef.current = null;
+          // Keep banner up a bit longer after audio ends
+          setTimeout(() => setShowIntro(false), 2000);
+        };
+        
+        audio.onerror = () => {
+          console.error('Audio playback error');
+          setIsSpeaking(false);
+          introAudioRef.current = null;
+          setTimeout(() => setShowIntro(false), 3000);
+        };
+        
+        // Play the audio
+        await audio.play();
+      } else {
+        throw new Error(data.error || 'Unknown audio generation error');
+      }
+         } catch (error) {
+       console.error('❌ Intro audio failed:', error);
+       setIsSpeaking(false);
+       // Fallback to showing banner for 6 seconds
+       setTimeout(() => setShowIntro(false), 6000);
+     }
+       }, []);
+
+  // Function to generate and play cooking audio using ElevenLabs
+  const playCookingAudio = useCallback(async (): Promise<void> => {
+    console.log('🔥 Generating cooking audio...');
+    setIsCooking(true);
+    
+    try {
+      const response = await fetch('/api/cooking-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate cooking audio');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ Cooking audio ready, playing...');
+        
+        // Create and play audio element
+        const audio = new Audio(data.audioUrl);
+        audio.volume = 0.8;
+        cookingAudioRef.current = audio;
+        
+        // Return a promise that resolves when audio finishes
+        return new Promise((resolve) => {
+          audio.onended = () => {
+            console.log('🔥 Cooking audio finished');
+            setIsCooking(false);
+            cookingAudioRef.current = null;
+            resolve();
+          };
+          
+          audio.onerror = () => {
+            console.error('Cooking audio playback error');
+            setIsCooking(false);
+            cookingAudioRef.current = null;
+            resolve();
+          };
+          
+          // Play the audio
+          audio.play().catch(() => {
+            console.error('Failed to play cooking audio');
+            setIsCooking(false);
+            cookingAudioRef.current = null;
+            resolve();
+          });
+        });
+      } else {
+        throw new Error(data.error || 'Unknown cooking audio generation error');
+      }
+    } catch (error) {
+      console.error('❌ Cooking audio failed:', error);
+      setIsCooking(false);
+      // Don't throw here, just continue with the roast
+    }
+  }, []);
+
+  // Show intro message and auto-play audio on page load
+  useEffect(() => {
+    setShowIntro(true);
+    
+    // Auto-play intro audio after a short delay
+    const timer = setTimeout(() => {
+      playIntroAudio();
+    }, 1000); // 1 second delay to ensure page is loaded
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [playIntroAudio]);
 
   const handleRoast = async () => {
     if (!url) return;
     
-    setLoading(true);
     setRoast(null);
     
     try {
+      // First, play the cooking audio
+      console.log('🎤 Playing cooking audio before roast...');
+      await playCookingAudio();
+      
+      // Now start the actual roast process
+      console.log('🔥 Starting roast generation...');
+      setLoading(true);
+      
       const response = await fetch('/api/roast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,7 +202,7 @@ export default function Home() {
       setRoast(data);
       setShowPreview(true);
       
-      // Auto-play the audio with 1.2x speed
+      // Auto-play the roast audio with speed
       setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.playbackRate = 1.15; // Speed up by 15%
@@ -193,7 +335,58 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex p-4">
+    <div className="min-h-screen bg-black flex p-4 relative">
+      {/* Intro Message Banner */}
+      {showIntro && (
+        <div className="fixed top-4 left-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-500">
+          <Card className="bg-gradient-to-r from-red-900 to-orange-900 border-red-500 shadow-xl shadow-red-500/20">
+            <CardContent className="p-4 relative">
+              <Button
+                onClick={() => {
+                  setShowIntro(false);
+                  setIsSpeaking(false);
+                  // Stop intro audio if playing
+                  if (introAudioRef.current) {
+                    introAudioRef.current.pause();
+                    introAudioRef.current = null;
+                  }
+                }}
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 text-white hover:bg-red-800/50 h-6 w-6"
+                title={isSpeaking ? "Stop AI voice" : "Close"}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <div className="text-center pr-8">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <p className="text-white font-bold text-lg">
+                    🎙️ Oh boy! It&apos;s time to get roasted! 🔥
+                  </p>
+                  {isSpeaking && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-1 h-3 bg-orange-400 animate-pulse"></div>
+                      <div className="w-1 h-4 bg-orange-400 animate-pulse delay-75"></div>
+                      <div className="w-1 h-2 bg-orange-400 animate-pulse delay-150"></div>
+                      <div className="w-1 h-4 bg-orange-400 animate-pulse delay-75"></div>
+                      <div className="w-1 h-3 bg-orange-400 animate-pulse"></div>
+                    </div>
+                  )}
+                </div>
+                
+                <p className="text-red-200 text-sm text-center">
+                  {isSpeaking ? (
+                    <span className="animate-pulse">🔊 AI is speaking...</span>
+                  ) : (
+                    <>We&apos;re live streaming this, right? If that&apos;s the case, lemme turn off my safety filters so we can go <span className="font-bold text-orange-300">FULL BORE</span> on these portfolio pages.</>
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
       <div className={`${showPreview ? 'w-full lg:w-1/2' : 'max-w-2xl w-full mx-auto'} transition-all duration-500`}>
         <div className="text-center mb-12">
           <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500 mb-4">
@@ -224,6 +417,13 @@ export default function Home() {
                 <div className="text-center">
                   <span className="text-orange-400 text-sm font-medium animate-bounce">
                     🎰 SPINNING... 🎰
+                  </span>
+                </div>
+              )}
+              {isCooking && (
+                <div className="text-center">
+                  <span className="text-red-400 text-sm font-medium animate-pulse">
+                    🔥 AI IS PREPARING TO ROAST... 🔥
                   </span>
                 </div>
               )}
@@ -268,11 +468,16 @@ export default function Home() {
             
             <Button 
               onClick={handleRoast} 
-              disabled={loading || !url || isSpinning}
+              disabled={loading || !url || isSpinning || isCooking}
               className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-bold text-xl h-16"
               size="lg"
             >
-              {loading ? (
+              {isCooking ? (
+                <>
+                  <Flame className="mr-2 h-6 w-6 animate-bounce" />
+                  PREPARING TO ROAST...
+                </>
+              ) : loading ? (
                 <>
                   <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                   Preparing the roast...
