@@ -45,7 +45,9 @@ export default function Home() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate roast');
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.details || 'Failed to generate roast');
       }
       
       const data = await response.json();
@@ -62,7 +64,8 @@ export default function Home() {
       }, 100);
     } catch (error) {
       console.error('Roast generation failed:', error);
-      alert('Failed to roast this portfolio. Is it a valid URL?');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to roast this portfolio: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
