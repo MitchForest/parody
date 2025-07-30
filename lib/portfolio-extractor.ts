@@ -45,34 +45,94 @@ export function extractPortfolioContent(html: string): PortfolioContent {
     $('h2:contains("Developer"), h2:contains("Engineer"), h2:contains("Designer")').first().text().trim() ||
     '';
   
-  // Extract projects
+  // Extract projects - enhanced selectors for modern portfolios
   const projects: PortfolioContent['projects'] = [];
-  $('.project, .portfolio-item, article, .work-item, .card').each((_, el) => {
-    const $el = $(el);
-    const projectName = $el.find('h3, h4, .project-title').first().text().trim();
-    const projectDesc = $el.find('p, .project-description').first().text().trim();
-    const techs = $el.find('.tech, .technology, .stack, .tag, .badge')
-      .map((_, tech) => $(tech).text().trim())
-      .get()
-      .filter(t => t.length > 0);
-    
-    if (projectName) {
-      projects.push({
-        name: projectName,
-        description: projectDesc,
-        technologies: techs,
-        link: $el.find('a').first().attr('href') || ''
-      });
-    }
+  
+  // Try multiple selector strategies
+  const projectSelectors = [
+    '.project, .portfolio-item, article, .work-item, .card',
+    '[class*="project"]:not(button):not(a)',
+    '[class*="work"]:not(nav):not(button)',
+    '[class*="portfolio"]:not(nav):not(button)',
+    '[data-project], [data-work]',
+    'section > div > div > div',
+    '.grid > div, .flex > div'
+  ];
+  
+  projectSelectors.forEach(selector => {
+    $(selector).each((_, el) => {
+      const $el = $(el);
+      const projectName = $el.find('h1, h2, h3, h4, [class*="title"], [class*="heading"]').first().text().trim() ||
+                          $el.children().first().text().trim();
+      const projectDesc = $el.find('p, [class*="description"], [class*="summary"]').first().text().trim() ||
+                          $el.text().substring(0, 200).trim();
+      const techs = $el.find('.tech, .technology, .stack, .tag, .badge, [class*="tech"], [class*="skill"], span')
+        .map((_, tech) => {
+          const text = $(tech).text().trim();
+          return text.length > 1 && text.length < 30 ? text : null;
+        })
+        .get()
+        .filter(t => t);
+      
+      // Check if this looks like a project (has name and some content)
+      if (projectName && projectName.length > 2 && projectName.length < 100 && 
+          (projectDesc.length > 10 || techs.length > 0)) {
+        // Avoid duplicates
+        const exists = projects.some(p => p.name === projectName);
+        if (!exists) {
+          projects.push({
+            name: projectName,
+            description: projectDesc,
+            technologies: [...new Set(techs)], // Remove duplicate techs
+            link: $el.find('a[href*="github"], a[href*="live"], a[href*="demo"]').first().attr('href') || ''
+          });
+        }
+      }
+    });
   });
   
-  // Extract skills
+  // Fallback: Look for project sections by headings
+  if (projects.length === 0) {
+    $('h2, h3, h4').each((_, heading) => {
+      const headingText = $(heading).text().toLowerCase();
+      if (headingText.includes('project') || headingText.includes('work') || headingText.includes('portfolio')) {
+        const $container = $(heading).parent();
+        $container.children().each((_, child) => {
+          const $child = $(child);
+          if ($child.is('div, article, section')) {
+            const name = $child.find('h3, h4, h5').first().text().trim() || 
+                        $child.children().first().text().trim();
+            if (name && name.length > 2) {
+              projects.push({
+                name: name,
+                description: $child.text().substring(0, 200).trim(),
+                technologies: [],
+                link: $child.find('a').first().attr('href') || ''
+              });
+            }
+          }
+        });
+      }
+    });
+  }
+  
+  // Extract skills - enhanced selectors
   const skills: string[] = [];
-  $('.skill, .technology, .tech-stack li, .skills li').each((_, el) => {
-    const skill = $(el).text().trim();
-    if (skill && skill.length < 50) { // Avoid paragraphs
-      skills.push(skill);
-    }
+  const skillSelectors = [
+    '.skill, .technology, .tech-stack li, .skills li',
+    '[class*="skill"]:not(h1):not(h2):not(h3)',
+    '[class*="tech"]:not(h1):not(h2):not(h3)',
+    '.badge, .tag, .chip',
+    'ul li span, ul li small'
+  ];
+  
+  skillSelectors.forEach(selector => {
+    $(selector).each((_, el) => {
+      const skill = $(el).text().trim();
+      if (skill && skill.length > 1 && skill.length < 50 && !skill.includes('\n')) {
+        skills.push(skill);
+      }
+    });
   });
   
   // Also look for skills in specific sections
